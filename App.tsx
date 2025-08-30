@@ -1,7 +1,8 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { Category, Field, FieldType, GamePhase, GameState, Player, Question, User, QuestionType } from './types';
-import { CATEGORIES, MAP_CONFIG, PLAYER_COLORS, INITIAL_COINS, POINTS, PHASE_DURATIONS, HINT_COSTS, PLAYER_COLOR_HEX, BASE_HP, FIELD_HP, AD_REWARD_COINS, BOT_NAMES, ELIMINATION_COIN_BONUS } from './constants';
+import { CATEGORIES, MAP_CONFIG, PLAYER_COLORS, INITIAL_COINS, POINTS, PHASE_DURATIONS, HINT_COSTS, PLAYER_COLOR_HEX, BASE_HP, FIELD_HP, AD_REWARD_COINS, BOT_NAMES, ELIMINATION_COIN_BONUS, WIN_COINS_PER_PLAYER } from './constants';
 import { generateQuestion, generateOpenEndedQuestion } from './services/geminiService';
 
 const ANSWER_TIME_LIMIT = 15; // 15 sekund na odpověď
@@ -253,6 +254,40 @@ const RulesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     );
 };
 
+const GameOverScreen: React.FC<{ gameState: GameState; onBackToLobby: () => void }> = ({ gameState, onBackToLobby }) => {
+    const { winners } = gameState;
+
+    return (
+        <Modal isOpen={true}>
+            <div className="text-center">
+                <h1 className="text-5xl font-bold text-cyan-400 mb-4 animate-text-focus-in">Hra Skončila!</h1>
+                {winners && winners.length > 0 ? (
+                    <>
+                        <h2 className="text-3xl text-yellow-400 mb-2">Vítěz: {winners.map(w => w.name).join(', ')}</h2>
+                        <p className="text-xl text-gray-300 mb-6">Konečné skóre: {winners[0].score.toLocaleString()} bodů</p>
+                    </>
+                ) : (
+                    <p className="text-2xl text-gray-400 mb-6">Hra skončila remízou.</p>
+                )}
+                
+                <h3 className="text-xl text-cyan-300 mb-3 border-t border-gray-700 pt-4">Konečné pořadí:</h3>
+                <div className="space-y-2 max-w-sm mx-auto">
+                    {[...gameState.players].sort((a,b) => b.score - a.score).map((p, index) => (
+                         <div key={p.id} className={`flex justify-between p-2 rounded ${winners?.some(w => w.id === p.id) ? 'bg-yellow-500/20' : 'bg-gray-700/50'}`}>
+                            <span className={`font-bold text-${p.color}-400`}>{index + 1}. {p.name}</span>
+                            <span className="text-white">{p.score.toLocaleString()} bodů</span>
+                        </div>
+                    ))}
+                </div>
+
+                <div className="mt-8">
+                    <NeonButton onClick={onBackToLobby}>Zpět do Lobby</NeonButton>
+                </div>
+            </div>
+        </Modal>
+    );
+};
+
 // --- HERNÍ KOMPONENTY ---
 const PlayerStatusUI: React.FC<{ players: Player[], currentPlayerId: string, board: Field[] }> = ({ players, currentPlayerId, board }) => {
     return (
@@ -451,8 +486,11 @@ const TimerUI: React.FC<{ startTime: number, timeLimit: number, onTimeout: () =>
                 if (intervalRef.current) clearInterval(intervalRef.current);
             }
         };
-
+        
+        // Clear previous interval if it exists
+        if (intervalRef.current) clearInterval(intervalRef.current);
         intervalRef.current = setInterval(updateTimer, 100);
+
         return () => {
             if (intervalRef.current) clearInterval(intervalRef.current);
         };
@@ -990,31 +1028,30 @@ export default function App() {
     }
   };
   
-    const resolveTurn = useCallback(async (currentState: GameState) => {
-        if (!currentState.activeQuestion) return;
-
-        let newState = JSON.parse(JSON.stringify(currentState));
-        const { attackerId, defenderId, targetFieldId, playerAnswers, question, questionType, actionType, isBaseAttack } = newState.activeQuestion;
+    const finalizeTurnResolution = useCallback(async (initialState: GameState) => {
+        let finalState = JSON.parse(JSON.stringify(initialState));
+        if (!finalState.activeQuestion) return;
         
-        const attacker = newState.players.find((p: Player) => p.id === attackerId);
-        const field = newState.board.find((f: Field) => f.id === targetFieldId);
+        const { attackerId, defenderId, targetFieldId, playerAnswers, question, questionType, actionType, isBaseAttack } = finalState.activeQuestion;
+        
+        const attacker = finalState.players.find((p: Player) => p.id === attackerId);
+        const field = finalState.board.find((f: Field) => f.id === targetFieldId);
         let elimination: { eliminatedPlayerName: string, attackerName: string } | null = null;
         
         const attackerAnswer = playerAnswers[attackerId];
-        const isAttackerCorrect = questionType === 'MULTIPLE_CHOICE' ? attackerAnswer === question.correctAnswer : normalizeAnswer(attackerAnswer) === normalizeAnswer(question.correctAnswer);
+        const isAttackerCorrect = questionType === 'MULTIPLE_CHOICE' ? attackerAnswer === question.correctAnswer : normalizeAnswer(attackerAnswer || "") === normalizeAnswer(question.correctAnswer);
         
-        newState.answerResult = { playerId: attackerId, isCorrect: isAttackerCorrect, correctAnswer: question.correctAnswer };
-
+        // Tie-breaker logic
         if (defenderId) {
-            const defender = newState.players.find((p: Player) => p.id === defenderId);
             const defenderAnswer = playerAnswers[defenderId];
-            const isDefenderCorrect = questionType === 'MULTIPLE_CHOICE' ? defenderAnswer === question.correctAnswer : normalizeAnswer(defenderAnswer) === normalizeAnswer(question.correctAnswer);
-            newState.answerResult = { playerId: defenderId, isCorrect: isDefenderCorrect, correctAnswer: question.correctAnswer };
-
-            if (isAttackerCorrect && isDefenderCorrect && !isBaseAttack) {
-                // TIE BREAKER!
-                newState.gameLog.push(`ROZSTŘEL mezi ${attacker.name} a ${defender.name}!`);
-                advanceGameState(newState);
+            const isDefenderCorrect = questionType === 'MULTIPLE_CHOICE' ? defenderAnswer === question.correctAnswer : normalizeAnswer(defenderAnswer || "") === normalizeAnswer(question.correctAnswer);
+            
+            if (isAttackerCorrect && isDefenderCorrect && !isBaseAttack && !finalState.activeQuestion.isTieBreaker) {
+                const defender = finalState.players.find((p: Player) => p.id === defenderId);
+                if (defender) {
+                    finalState.gameLog.push(`ROZSTŘEL mezi ${attacker.name} a ${defender.name}!`);
+                }
+                advanceGameState(finalState);
                 
                 setIsLoadingQuestion(true);
                 const tieBreakerQuestion = await generateOpenEndedQuestion(field.category, question.question, user?.questionHistory);
@@ -1022,9 +1059,9 @@ export default function App() {
                 
                 if (tieBreakerQuestion) {
                     setGameState(prev => {
-                       if(!prev || !prev.activeQuestion) return prev;
+                       if (!prev || !prev.activeQuestion) return prev;
                        const newHistory = [...(user?.questionHistory || []), tieBreakerQuestion.question];
-                       setUser(u => u ? {...u, questionHistory: newHistory} : null);
+                       setUser(u => u ? { ...u, questionHistory: newHistory } : null);
                        localStorage.setItem('ludus_question_history', JSON.stringify(newHistory));
                        return {
                            ...prev,
@@ -1037,10 +1074,10 @@ export default function App() {
                                playerAnswers: { [attackerId]: null, [defenderId]: null },
                                startTime: Date.now(),
                            }
-                       }
+                       };
                     });
                 } else {
-                    newState.gameLog.push("Chyba při generování rozstřelu, kolo končí remízou.");
+                    finalState.gameLog.push("Chyba při generování rozstřelu, kolo končí remízou.");
                     // Fallback to end turn as draw
                 }
                 return; // Stop further processing until tie-breaker is resolved
@@ -1048,139 +1085,134 @@ export default function App() {
         }
         
         // --- Standard Turn Resolution ---
-
-        // (This part will now run after showing answer feedback, or if there's no tie-breaker)
-        gameLogicTimeoutRef.current = setTimeout(() => {
-            let finalState = JSON.parse(JSON.stringify(currentState)); // Re-clone to work with fresh state
-            const { attackerId, defenderId, targetFieldId, playerAnswers, question, questionType, actionType, isBaseAttack } = finalState.activeQuestion;
-            const attacker = finalState.players.find((p: Player) => p.id === attackerId);
-            const field = finalState.board.find((f: Field) => f.id === targetFieldId);
-
-            const attackerAnswer = playerAnswers[attackerId];
-            const isAttackerCorrect = questionType === 'MULTIPLE_CHOICE' ? attackerAnswer === question.correctAnswer : normalizeAnswer(attackerAnswer) === normalizeAnswer(question.correctAnswer);
-            
-            if (actionType === 'HEAL') {
-                if (isAttackerCorrect) {
-                    field.hp = Math.min(field.maxHp, field.hp + 1);
-                    attacker.score += POINTS.HEAL_SUCCESS;
-                    finalState.gameLog.push(`${attacker.name} si úspěšně opravil základnu a získal ${POINTS.HEAL_SUCCESS} bodů.`);
-                } else {
-                    attacker.score += POINTS.HEAL_FAIL_PENALTY;
-                    finalState.gameLog.push(`${attacker.name} neuspěl při opravě základny a ztratil ${-POINTS.HEAL_FAIL_PENALTY} bodů.`);
-                }
-            } else if (actionType === 'ATTACK') {
-                if (defenderId) { // Duel or Base Attack
-                    const defender = finalState.players.find((p: Player) => p.id === defenderId);
-                    const defenderAnswer = playerAnswers[defenderId];
-                    const isDefenderCorrect = questionType === 'MULTIPLE_CHOICE' ? defenderAnswer === question.correctAnswer : normalizeAnswer(defenderAnswer) === normalizeAnswer(question.correctAnswer);
-                    
-                    if (isAttackerCorrect && !isDefenderCorrect) { // Attacker wins
-                        field.hp -= 1;
-                        if(isBaseAttack) {
-                            attacker.score += POINTS.ATTACK_DAMAGE;
-                            finalState.gameLog.push(`${attacker.name} zasáhl základnu hráče ${defender.name}!`);
-                        } else {
-                            field.ownerId = attackerId;
-                            field.hp = field.maxHp;
-                            attacker.score += POINTS.ATTACK_WIN;
-                            defender.score += POINTS.ATTACK_LOSS_DEFENDER;
-                            finalState.gameLog.push(`${attacker.name} dobyl území od hráče ${defender.name}!`);
-                        }
-                    } else if (!isAttackerCorrect && isDefenderCorrect) { // Defender wins
-                        attacker.score += POINTS.ATTACK_LOSS_ATTACKER;
-                        if(!isBaseAttack) defender.score += POINTS.ATTACK_WIN_DEFENDER;
-                        finalState.gameLog.push(`${defender.name} ubránil své území proti ${attacker.name}.`);
-                    } else if (!isAttackerCorrect && !isDefenderCorrect) { // Both wrong
-                        attacker.score += POINTS.ATTACK_LOSS_ATTACKER / 2;
-                        finalState.gameLog.push(`Oba hráči, ${attacker.name} a ${defender.name}, odpověděli špatně!`);
-                    } else { // Both correct (tie-breaker already handled, or base attack) or some other case
-                        finalState.gameLog.push(`Souboj mezi ${attacker.name} a ${defender.name} skončil remízou!`);
-                    }
-                    
-                    if (field.hp <= 0) {
-                        field.ownerId = attackerId;
-                        field.hp = field.maxHp;
-                        if(isBaseAttack) {
-                            attacker.score += POINTS.BASE_DESTROY_BONUS + Math.max(0, defender.score);
-                            attacker.coins += ELIMINATION_COIN_BONUS;
-                            defender.score = 0;
-                            defender.isEliminated = true;
-                            elimination = { eliminatedPlayerName: defender.name, attackerName: attacker.name };
-                            finalState.gameLog.push(`${attacker.name} ZNIČIL základnu hráče ${defender.name} a vyřadil ho!`);
-                            finalState.board.forEach((f: Field) => {
-                                if (f.ownerId === defender.id) { f.ownerId = attacker.id; }
-                            });
-                        }
-                    }
-
-                } else { // Attacking black field
-                    if (isAttackerCorrect) {
-                        field.ownerId = attackerId;
-                        field.type = FieldType.Neutral;
-                        field.hp = field.maxHp;
-                        attacker.score += POINTS.BLACK_FIELD_CLAIM;
-                        finalState.gameLog.push(`${attacker.name} zabral černé území!`);
+        if (actionType === 'HEAL') {
+            if (isAttackerCorrect) {
+                field.hp = Math.min(field.maxHp, field.hp + 1);
+                attacker.score += POINTS.HEAL_SUCCESS;
+                finalState.gameLog.push(`${attacker.name} si úspěšně opravil základnu a získal ${POINTS.HEAL_SUCCESS} bodů.`);
+            } else {
+                attacker.score += POINTS.HEAL_FAIL_PENALTY;
+                finalState.gameLog.push(`${attacker.name} neuspěl při opravě základny a ztratil ${-POINTS.HEAL_FAIL_PENALTY} bodů.`);
+            }
+        } else if (actionType === 'ATTACK') {
+             if (defenderId) { // Duel or Base Attack
+                const defender = finalState.players.find((p: Player) => p.id === defenderId);
+                const defenderAnswer = playerAnswers[defenderId];
+                const isDefenderCorrect = questionType === 'MULTIPLE_CHOICE' ? defenderAnswer === question.correctAnswer : normalizeAnswer(defenderAnswer || "") === normalizeAnswer(question.correctAnswer);
+                
+                if (isAttackerCorrect && (!isDefenderCorrect || isBaseAttack)) { // Attacker wins (in base attack, defender doesn't answer)
+                    field.hp -= 1;
+                    if (isBaseAttack) {
+                        attacker.score += POINTS.ATTACK_DAMAGE;
+                        finalState.gameLog.push(`${attacker.name} zasáhl základnu hráče ${defender.name}!`);
                     } else {
-                        attacker.score += POINTS.BLACK_FIELD_FAIL;
-                        finalState.gameLog.push(`${attacker.name} neuspěl při zabírání černého území.`);
+                        field.ownerId = attackerId;
+                        field.hp = field.maxHp;
+                        attacker.score += POINTS.ATTACK_WIN;
+                        defender.score += POINTS.ATTACK_LOSS_DEFENDER;
+                        finalState.gameLog.push(`${attacker.name} dobyl území od hráče ${defender.name}!`);
                     }
+                } else if (!isAttackerCorrect && isDefenderCorrect) { // Defender wins
+                    attacker.score += POINTS.ATTACK_LOSS_ATTACKER;
+                    if (!isBaseAttack) defender.score += POINTS.ATTACK_WIN_DEFENDER;
+                    finalState.gameLog.push(`${defender.name} ubránil své území proti ${attacker.name}.`);
+                } else if (!isAttackerCorrect && (!isDefenderCorrect || isBaseAttack)) { // Attacker wrong (defender doesn't matter)
+                    attacker.score += POINTS.ATTACK_LOSS_ATTACKER;
+                    finalState.gameLog.push(`${attacker.name} odpověděl špatně a útok se nezdařil.`);
+                } else { // Both correct in duel (tie-breaker already handled) or some other case
+                    finalState.gameLog.push(`Souboj mezi ${attacker.name} a ${defender.name} skončil remízou!`);
+                }
+                
+                if (field.hp <= 0) {
+                    field.ownerId = attackerId;
+                    field.hp = field.maxHp;
+                    if (isBaseAttack) {
+                        attacker.score += POINTS.BASE_DESTROY_BONUS + Math.max(0, defender.score);
+                        attacker.coins += ELIMINATION_COIN_BONUS;
+                        defender.score = 0;
+                        defender.isEliminated = true;
+                        elimination = { eliminatedPlayerName: defender.name, attackerName: attacker.name };
+                        finalState.gameLog.push(`${attacker.name} ZNIČIL základnu hráče ${defender.name} a vyřadil ho!`);
+                        finalState.board.forEach((f: Field) => {
+                            if (f.ownerId === defender.id) { f.ownerId = attacker.id; }
+                        });
+                    }
+                }
+
+            } else { // Attacking black field
+                if (isAttackerCorrect) {
+                    field.ownerId = attackerId;
+                    field.type = FieldType.Neutral;
+                    field.hp = field.maxHp;
+                    attacker.score += POINTS.BLACK_FIELD_CLAIM;
+                    finalState.gameLog.push(`${attacker.name} zabral černé území!`);
+                } else {
+                    attacker.score += POINTS.BLACK_FIELD_FAIL;
+                    finalState.gameLog.push(`${attacker.name} neuspěl při zabírání černého území.`);
                 }
             }
-            
-            finalState.players.forEach((p: Player) => {
-                const oldPlayer = currentState.players.find(op => op.id === p.id);
-                if (p.score < 0 && oldPlayer && !oldPlayer.isEliminated) {
-                    p.isEliminated = true;
-                    elimination = { eliminatedPlayerName: p.name, attackerName: 'Záporné skóre' };
-                    finalState.gameLog.push(`${p.name} byl vyřazen kvůli záporným bodům!`);
-                    finalState.board.forEach((f: Field) => {
-                        if (f.ownerId === p.id && f.type !== FieldType.PlayerBase) { f.ownerId = null; f.type = FieldType.Black; }
-                    });
-                }
-            });
-            
-            // Turn progression logic
+        }
+        
+        finalState.players.forEach((p: Player) => {
+            const oldPlayer = initialState.players.find(op => op.id === p.id);
+            if (p.score < 0 && oldPlayer && !oldPlayer.isEliminated) {
+                p.isEliminated = true;
+                elimination = { eliminatedPlayerName: p.name, attackerName: 'Záporné skóre' };
+                finalState.gameLog.push(`${p.name} byl vyřazen kvůli záporným bodům!`);
+                finalState.board.forEach((f: Field) => {
+                    if (f.ownerId === p.id && f.type !== FieldType.PlayerBase) { f.ownerId = null; f.type = FieldType.Black; }
+                });
+            }
+        });
+
+        const activePlayers = finalState.players.filter((p: Player) => !p.isEliminated);
+        if (activePlayers.length <= 1) {
+            finalState.gamePhase = GamePhase.GameOver;
+            finalState.winners = activePlayers;
+        } else {
+             // Turn progression logic
             const currentAttackers = getAttackers(finalState.players);
             const currentAttackerInListIndex = currentAttackers.findIndex(p => p.id === attackerId);
             
             if (currentAttackerInListIndex === -1 || currentAttackerInListIndex === currentAttackers.length - 1 || currentAttackers.length === 0) {
                 finalState.round += 1;
                 if (finalState.round > PHASE_DURATIONS.PHASE2_ROUNDS) {
-                    finalState.gamePhase = GamePhase.Phase3_FinalShowdown;
-                    finalState.round = 1;
-                    finalState.gameLog.push("--- Fáze 3: Finále! ---");
+                    finalState.gamePhase = GamePhase.GameOver;
+                    const highestScore = Math.max(...activePlayers.map(p => p.score));
+                    finalState.winners = activePlayers.filter(p => p.score === highestScore);
                 } else {
                     const nextRoundAttackers = getAttackers(finalState.players);
                     if (nextRoundAttackers.length > 0) {
                         finalState.currentTurnPlayerIndex = finalState.players.findIndex((p: Player) => p.id === nextRoundAttackers[0].id);
                     } else {
-                         finalState.gamePhase = GamePhase.GameOver; // No one left to attack
+                         finalState.gamePhase = GamePhase.GameOver;
+                         finalState.winners = activePlayers;
                     }
                 }
             } else {
                 const nextAttacker = currentAttackers[currentAttackerInListIndex + 1];
                 finalState.currentTurnPlayerIndex = finalState.players.findIndex((p: Player) => p.id === nextAttacker.id);
             }
-            
-            finalState.activeQuestion = null;
-            finalState.answerResult = null; // Clear feedback
-            if(elimination) finalState.eliminationResult = elimination;
-            advanceGameState(finalState);
+        }
+        
+        finalState.activeQuestion = null;
+        finalState.answerResult = null; // Clear feedback
+        if (elimination) finalState.eliminationResult = elimination;
+        advanceGameState(finalState);
 
-            if (elimination) {
-                gameLogicTimeoutRef.current = setTimeout(() => {
-                    setGameState(s => s ? {...s, eliminationResult: null} : null);
-                }, 3000);
-            }
+        if (elimination) {
+            gameLogicTimeoutRef.current = setTimeout(() => {
+                setGameState(s => s ? { ...s, eliminationResult: null } : null);
+            }, 3000);
+        }
 
-        }, 3000);
     }, [user?.questionHistory]);
 
   const handleAnswer = (answer: string) => {
     if (!gameState || !gameState.activeQuestion) return;
     if (gameLogicTimeoutRef.current) clearTimeout(gameLogicTimeoutRef.current);
 
-    const { gamePhase, activeQuestion } = gameState;
+    const { activeQuestion } = gameState;
     const humanPlayer = gameState.players.find(p => !p.isBot)!;
     
     const isCorrect = activeQuestion.questionType === 'MULTIPLE_CHOICE' 
@@ -1189,22 +1221,28 @@ export default function App() {
 
     setGameState(prev => {
         if (!prev || !prev.activeQuestion) return prev;
-        let updatedActiveQuestion = { ...prev.activeQuestion };
+        
+        // Update the answer in the current state
+        const updatedActiveQuestion = { ...prev.activeQuestion };
         updatedActiveQuestion.playerAnswers[humanPlayer.id] = answer;
+        
+        // Show feedback immediately
+        const newStateWithFeedback = {
+            ...prev,
+            answerResult: { playerId: humanPlayer.id, isCorrect, correctAnswer: activeQuestion.question.correctAnswer },
+            activeQuestion: updatedActiveQuestion
+        };
 
         const allPlayersAnswered = Object.values(updatedActiveQuestion.playerAnswers).every(ans => ans !== null);
 
         if (allPlayersAnswered) {
-             resolveTurn({ ...prev, activeQuestion: updatedActiveQuestion });
-        } else {
-            // Still waiting for others
+             // If all have answered, set a timeout to finalize the turn after showing feedback
+            gameLogicTimeoutRef.current = setTimeout(() => {
+                finalizeTurnResolution(newStateWithFeedback);
+            }, 3000);
         }
-        
-        return {
-            ...prev,
-            answerResult: { playerId: humanPlayer.id, isCorrect, correctAnswer: activeQuestion.question.correctAnswer },
-            activeQuestion: updatedActiveQuestion
-        }
+
+        return newStateWithFeedback;
     });
   };
 
@@ -1220,6 +1258,11 @@ export default function App() {
           handleAnswer(gameState.activeQuestion.question.correctAnswer);
       }
   };
+  
+    const handleBackToLobby = () => {
+        setGameState(null);
+        setScreen('LOBBY');
+    };
 
   useEffect(() => {
     if (gameState?.gamePhase === GamePhase.Phase1_LandGrab) {
@@ -1282,7 +1325,7 @@ export default function App() {
                 tempState.activeQuestion = {
                     question, questionType: 'MULTIPLE_CHOICE', targetFieldId: botBase.id, attackerId: currentPlayer.id, actionType: 'HEAL', isBaseAttack: false, isTieBreaker: false, playerAnswers: { [currentPlayer.id]: answer }, startTime: Date.now()
                 };
-                resolveTurn(tempState);
+                finalizeTurnResolution(tempState);
                 return;
             }
         }
@@ -1353,9 +1396,14 @@ export default function App() {
                 const isDefenderCorrect = Math.random() < 0.6;
                 newState.activeQuestion.playerAnswers[defender.id] = isDefenderCorrect ? question.correctAnswer : "wrong_bot_answer_2";
             }
-            resolveTurn(newState);
+            // FIX: Check for defender existence before accessing its properties
+            if (defender && newState.activeQuestion?.playerAnswers) {
+                const isDefenderCorrect = Math.random() < 0.6;
+                newState.activeQuestion.playerAnswers[defender.id] = isDefenderCorrect ? question.correctAnswer : "wrong_bot_answer_2";
+            }
+            finalizeTurnResolution(newState);
         }
-    }, [passBotTurn, resolveTurn, user?.questionHistory]);
+    }, [passBotTurn, finalizeTurnResolution, user?.questionHistory]);
 
     useEffect(() => {
         if (botTurnTimeoutRef.current) clearTimeout(botTurnTimeoutRef.current);
@@ -1376,6 +1424,27 @@ export default function App() {
         
         return () => { if (botTurnTimeoutRef.current) clearTimeout(botTurnTimeoutRef.current); };
     }, [gameState, isLoadingQuestion, handleBotAttackTurn, passBotTurn]);
+    
+    // Efekt pro aktualizaci stavu mincí po skončení hry
+    useEffect(() => {
+        if (gameState?.gamePhase === GamePhase.GameOver && user) {
+            const humanPlayer = gameState.players.find(p => !p.isBot);
+            if (!humanPlayer) return;
+
+            const isWinner = gameState.winners?.some(w => w.id === humanPlayer.id) ?? false;
+            
+            let finalCoins = humanPlayer.coins;
+            if (isWinner) {
+                const totalPlayers = gameState.players.length;
+                const winBonus = (totalPlayers - 1) * WIN_COINS_PER_PLAYER;
+                finalCoins += winBonus;
+            }
+
+            const updatedUser = { ...user, luduCoins: finalCoins };
+            setUser(updatedUser);
+            localStorage.setItem('ludus_user', JSON.stringify(updatedUser));
+        }
+    }, [gameState?.gamePhase]);
 
 
   const renderScreen = () => {
@@ -1397,6 +1466,9 @@ export default function App() {
         return <RulesScreen onBack={() => setScreen('LOBBY')} />;
       case 'GAME':
         if (!gameState) return null;
+        if (gameState.gamePhase === GamePhase.GameOver) {
+            return <GameOverScreen gameState={gameState} onBackToLobby={handleBackToLobby} />;
+        }
         const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
         const humanPlayer = gameState.players.find(p => !p.isBot)!;
         const isHumanAnswering = gameState.activeQuestion?.playerAnswers.hasOwnProperty(humanPlayer.id);
@@ -1495,6 +1567,7 @@ export default function App() {
 
   return (
     <div className="bg-gray-900">
+        <Analytics />
         {renderScreen()}
         {isAdModalOpen && <AdRewardModal onClaim={() => {
             setUser(u => u ? {...u, luduCoins: u.luduCoins + AD_REWARD_COINS} : u);
