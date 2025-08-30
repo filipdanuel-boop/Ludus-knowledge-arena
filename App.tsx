@@ -1396,11 +1396,6 @@ export default function App() {
                 const isDefenderCorrect = Math.random() < 0.6;
                 newState.activeQuestion.playerAnswers[defender.id] = isDefenderCorrect ? question.correctAnswer : "wrong_bot_answer_2";
             }
-            // FIX: Check for defender existence before accessing its properties
-            if (defender && newState.activeQuestion?.playerAnswers) {
-                const isDefenderCorrect = Math.random() < 0.6;
-                newState.activeQuestion.playerAnswers[defender.id] = isDefenderCorrect ? question.correctAnswer : "wrong_bot_answer_2";
-            }
             finalizeTurnResolution(newState);
         }
     }, [passBotTurn, finalizeTurnResolution, user?.questionHistory]);
@@ -1452,7 +1447,14 @@ export default function App() {
       case 'AUTH':
         return <AuthScreen onLogin={handleLogin} />;
       case 'LOBBY':
-        return user && <LobbyScreen user={user} onNavigate={handleNavigate} onGetFreeCoins={() => setIsAdModalOpen(true)} />;
+        if (!user) {
+          return (
+            <div className="min-h-screen flex items-center justify-center">
+              <Spinner />
+            </div>
+          );
+        }
+        return <LobbyScreen user={user} onNavigate={handleNavigate} onGetFreeCoins={() => setIsAdModalOpen(true)} />;
       case 'ONLINE_LOBBY':
           return <OnlineLobbyScreen onStartGame={handleStartOnlineGame} onBack={() => setScreen('LOBBY')} />;
       case 'FINDING_MATCH':
@@ -1465,7 +1467,13 @@ export default function App() {
       case 'RULES':
         return <RulesScreen onBack={() => setScreen('LOBBY')} />;
       case 'GAME':
-        if (!gameState) return null;
+        if (!gameState) {
+          return (
+            <div className="min-h-screen flex items-center justify-center">
+              <Spinner />
+            </div>
+          );
+        }
         if (gameState.gamePhase === GamePhase.GameOver) {
             return <GameOverScreen gameState={gameState} onBackToLobby={handleBackToLobby} />;
         }
@@ -1560,8 +1568,14 @@ export default function App() {
             </div>
         );
       default:
-        // Zkontrolujte, zda je uživatel v procesu načítání, abyste předešli blikání
-        return user ? null : <AuthScreen onLogin={handleLogin} />;
+        if (user) {
+          return (
+            <div className="min-h-screen flex items-center justify-center">
+              <Spinner />
+            </div>
+          );
+        }
+        return <AuthScreen onLogin={handleLogin} />;
     }
   };
 
