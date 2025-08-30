@@ -1,0 +1,77 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LUDUS: Knowledge Arena</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body {
+        overscroll-behavior: none;
+        background-color: #111827; /* bg-gray-900 */
+        color: white;
+        font-family: sans-serif;
+      }
+      .animate-fade-in {
+        animation: fade-in 0.5s ease-out forwards;
+      }
+      .animate-text-focus-in {
+	    -webkit-animation: text-focus-in 1s cubic-bezier(0.550, 0.085, 0.680, 0.530) both;
+	    animation: text-focus-in 1s cubic-bezier(0.550, 0.085, 0.680, 0.530) both;
+      }
+      .animate-shake {
+        animation: shake 0.82s cubic-bezier(.36,.07,.19,.97) both;
+      }
+      .animate-pulse-bright {
+        animation: pulse-bright 1.5s ease-in-out infinite;
+      }
+
+      @keyframes fade-in {
+        from { opacity: 0; transform: scale(0.95); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      
+      @-webkit-keyframes text-focus-in {
+        0% { -webkit-filter: blur(12px); filter: blur(12px); opacity: 0; }
+        100% { -webkit-filter: blur(0px); filter: blur(0px); opacity: 1; }
+      }
+      @keyframes text-focus-in {
+        0% { -webkit-filter: blur(12px); filter: blur(12px); opacity: 0; }
+        100% { -webkit-filter: blur(0px); filter: blur(0px); opacity: 1; }
+      }
+      
+      @keyframes shake {
+        10%, 90% { transform: translate3d(-1px, 0, 0); }
+        20%, 80% { transform: translate3d(2px, 0, 0); }
+        30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+        40%, 60% { transform: translate3d(4px, 0, 0); }
+      }
+
+      @keyframes pulse-bright {
+        0%, 100% {
+          text-shadow: 0 0 10px #06b6d4, 0 0 20px #06b6d4;
+        }
+        50% {
+          text-shadow: 0 0 20px #0891b2, 0 0 40px #0891b2;
+        }
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
+    "react/": "https://aistudiocdn.com/react@^19.1.1/",
+    "react": "https://aistudiocdn.com/react@^19.1.1",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.16.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
