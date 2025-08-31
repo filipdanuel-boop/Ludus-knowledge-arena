@@ -5,7 +5,6 @@ import { gameReducer } from './services/gameLogic';
 import appMetadata from './metadata.json';
 import { themes } from './themes';
 import * as userService from './services/userService';
-// FIX: Import AD_REWARD_COINS constant to resolve reference error.
 import { AD_REWARD_COINS } from './constants';
 
 // Import screen components
@@ -98,7 +97,6 @@ export default function App() {
         return <LobbyScreen 
             user={user} 
             setUser={setUser}
-            // FIX: The onNavigate prop expects a function that takes a string, but setScreen takes a specific Screen type. This wrapper with a type assertion handles the mismatch.
             onNavigate={(s) => setScreen(s as Screen)} 
             onGetFreeCoins={() => setIsAdModalOpen(true)} 
             onOpenThemeSelector={() => setIsThemeModalOpen(true)} 

@@ -3,9 +3,9 @@ import type { Question, Language, Category, QuestionDifficulty } from '../types'
 import { questionBank } from './questionBank';
 import { normalizeAnswer } from '../utils';
 
-// FIX: Switched to process.env.API_KEY to align with coding guidelines and resolve TypeScript error.
-// DŮLEŽITÉ: Pro nasazení na Vercel musíte nastavit proměnou prostředí s názvem 'API_KEY'.
+// DŮLEŽITÉ: Pro nasazení na Vercel musíte nastavit proměnnou prostředí s názvem 'API_KEY'.
 // Jděte do nastavení vašeho projektu -> Settings -> Environment Variables a přidejte ji.
+// FIX: Switched to process.env.API_KEY to align with coding guidelines and resolve TypeScript error.
 const apiKey = process.env.API_KEY;
 
 let ai: GoogleGenAI | null = null;
