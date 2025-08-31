@@ -1,12 +1,7 @@
-import { GameState, GameAction, Player, Field, GamePhase, FieldType, Category, User, Question, Language } from '../types';
-import { CATEGORIES, PLAYER_COLORS, BASE_HP, FIELD_HP, BOT_NAMES, POINTS, PHASE_DURATIONS, ELIMINATION_COIN_BONUS } from '../constants';
+import { GameState, GameAction, Player, Field, GamePhase, FieldType, Category, User, Question, UserStats } from '../types';
+import { CATEGORIES, PLAYER_COLORS, BASE_HP, FIELD_HP, BOT_NAMES, POINTS, PHASE_DURATIONS, ELIMINATION_COIN_BONUS, XP_PER_CORRECT_ANSWER, XP_FOR_WIN } from '../constants';
 import { normalizeAnswer } from '../utils';
 
-// Helper to save user-specific data
-const saveUserData = (user: User) => {
-    localStorage.setItem(`ludus_coins_${user.email}`, String(user.luduCoins));
-    localStorage.setItem(`ludus_history_${user.email}`, JSON.stringify(user.questionHistory));
-};
 
 export const createInitialGameState = (playerCount: number, user: User, isOnlineMode: boolean = false): GameState => {
     const players: Player[] = Array.from({ length: playerCount }, (_, i) => {
@@ -63,6 +58,18 @@ export const createInitialGameState = (playerCount: number, user: User, isOnline
         field.hp = FIELD_HP;
         field.maxHp = FIELD_HP;
     });
+
+    // Initialize stats for the match
+    const matchStats = players.reduce((acc, player) => {
+        if (!player.isBot) {
+            // FIX: Initialize xpEarned property for the human player's match statistics.
+            acc[player.id] = { correct: 0, total: 0, xpEarned: 0, categories: Object.values(Category).reduce((catAcc, cat) => {
+                catAcc[cat] = { correct: 0, total: 0 };
+                return catAcc;
+            }, {} as Record<Category, { correct: 0, total: 0}>) };
+        }
+        return acc;
+    }, {} as GameState['matchStats']);
     
     return {
         players,
@@ -77,7 +84,8 @@ export const createInitialGameState = (playerCount: number, user: User, isOnline
         gameStartTime: Date.now(),
         answerResult: null,
         eliminationResult: null,
-        questionHistory: user.questionHistory || []
+        questionHistory: [], // Start fresh for each game
+        matchStats,
     };
 };
 
@@ -132,6 +140,7 @@ const handleHealAction = (state: GameState) => {
     if (isCorrect) {
         field.hp = Math.min(field.maxHp, field.hp + 1);
         attacker.score += POINTS.HEAL_SUCCESS;
+        if(!attacker.isBot) state.matchStats[attacker.id].xpEarned += XP_PER_CORRECT_ANSWER;
         state.gameLog.push(`${attacker.name} si úspěšně opravil základnu.`);
     } else {
         attacker.score += POINTS.HEAL_FAIL_PENALTY;
@@ -149,6 +158,9 @@ const handleAttackAction = (state: GameState, tieBreakerQuestion?: Question) => 
         const defender = state.players.find(p => p.id === defenderId)!;
         const isAttackerCorrect = normalizeAnswer(playerAnswers[attackerId] || "") === normalizeAnswer(question.correctAnswer);
         const isDefenderCorrect = normalizeAnswer(playerAnswers[defenderId] || "") === normalizeAnswer(question.correctAnswer);
+
+        if(!attacker.isBot && isAttackerCorrect) state.matchStats[attacker.id].xpEarned += XP_PER_CORRECT_ANSWER;
+        if(!defender.isBot && isDefenderCorrect) state.matchStats[defender.id].xpEarned += XP_PER_CORRECT_ANSWER;
 
         if (isAttackerCorrect && isDefenderCorrect && !isBaseAttack && !state.activeQuestion!.isTieBreaker) {
             if (tieBreakerQuestion) {
@@ -192,6 +204,7 @@ const handleAttackAction = (state: GameState, tieBreakerQuestion?: Question) => 
             field.ownerId = attackerId;
             field.type = FieldType.Neutral;
             field.hp = field.maxHp;
+            if(!attacker.isBot) state.matchStats[attacker.id].xpEarned += XP_PER_CORRECT_ANSWER;
             attacker.score += POINTS.BLACK_FIELD_CLAIM;
             state.gameLog.push(`${attacker.name} zabral černé území!`);
         } else {
@@ -237,6 +250,9 @@ const advanceTurnAndRound = (state: GameState): GameState => {
     if (activePlayers.length <= 1) {
         state.gamePhase = GamePhase.GameOver;
         state.winners = activePlayers;
+        if(activePlayers.length === 1 && !activePlayers[0].isBot){
+             state.matchStats[activePlayers[0].id].xpEarned += XP_FOR_WIN;
+        }
         return state;
     }
 
@@ -250,6 +266,11 @@ const advanceTurnAndRound = (state: GameState): GameState => {
             state.gamePhase = GamePhase.GameOver;
             const highestScore = Math.max(...activePlayers.map(p => p.score));
             state.winners = activePlayers.filter(p => p.score === highestScore);
+            state.winners.forEach(winner => {
+                if(!winner.isBot){
+                    state.matchStats[winner.id].xpEarned += XP_FOR_WIN;
+                }
+            })
         } else {
             const nextRoundAttackers = getAttackers(state.players);
             if (nextRoundAttackers.length > 0) {
@@ -305,20 +326,9 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
 
         case 'SET_QUESTION': {
             if (!state) return null;
-            const humanPlayer = state.players.find(p => !p.isBot);
-            const updatedHistory = [...state.questionHistory, action.payload!.question.question];
-            if (humanPlayer) {
-                // FIX: Construct a valid User object to pass to saveUserData.
-                saveUserData({
-                    email: humanPlayer.id.replace('player-1', ''), // A bit of a hack for email
-                    luduCoins: humanPlayer.coins,
-                    language: 'cs', // Hardcoding language as it is not available in the reducer state
-                    questionHistory: updatedHistory
-                });
-            }
             return {
                 ...state,
-                questionHistory: updatedHistory,
+                questionHistory: [...state.questionHistory, action.payload!.question.question],
                 activeQuestion: action.payload
             };
         }
@@ -329,17 +339,38 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
         
         case 'SUBMIT_ANSWER': {
             if (!state || !state.activeQuestion) return state;
-            const { playerId, answer } = action.payload;
+            const { playerId, answer, category } = action.payload;
             const isCorrect = normalizeAnswer(answer) === normalizeAnswer(state.activeQuestion.question.correctAnswer);
+            const player = state.players.find(p => p.id === playerId);
 
-            const updatedActiveQuestion = {
-                ...state.activeQuestion,
-                playerAnswers: { ...state.activeQuestion.playerAnswers, [playerId]: answer }
-            };
+            // Update stats only for the human player
+            if (player && !player.isBot) {
+                const newMatchStats = { ...state.matchStats };
+                newMatchStats[playerId].total++;
+                newMatchStats[playerId].categories[category].total++;
+                if (isCorrect) {
+                    newMatchStats[playerId].correct++;
+                    newMatchStats[playerId].categories[category].correct++;
+                }
+                
+                return {
+                    ...state,
+                    matchStats: newMatchStats,
+                    activeQuestion: {
+                        ...state.activeQuestion,
+                        playerAnswers: { ...state.activeQuestion.playerAnswers, [playerId]: answer }
+                    },
+                    answerResult: { playerId, isCorrect, correctAnswer: state.activeQuestion.question.correctAnswer }
+                };
+            }
 
+            // For bots, just update the answer
             return {
                 ...state,
-                activeQuestion: updatedActiveQuestion,
+                activeQuestion: {
+                    ...state.activeQuestion,
+                    playerAnswers: { ...state.activeQuestion.playerAnswers, [playerId]: answer }
+                },
                 answerResult: { playerId, isCorrect, correctAnswer: state.activeQuestion.question.correctAnswer }
             };
         }
@@ -353,6 +384,7 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
             if (action.payload.humanActionResult === 'win') {
                 newState.board[fieldIndex].ownerId = humanPlayer.id;
                 humanPlayer.score += POINTS.PHASE1_CLAIM;
+                newState.matchStats[humanPlayer.id].xpEarned += XP_PER_CORRECT_ANSWER;
                 newState.gameLog.push(`${humanPlayer.name} jste zabral pole a získal ${POINTS.PHASE1_CLAIM} bodů.`);
             } else {
                 newState.board[fieldIndex].type = FieldType.Black;
@@ -405,16 +437,6 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
 
         case 'UPDATE_PLAYERS':
              if (!state) return state;
-             const humanPlayer = action.payload.find(p => !p.isBot);
-             if (humanPlayer) {
-                 // FIX: Construct a valid User object to pass to saveUserData, mapping coins to luduCoins.
-                 saveUserData({
-                     email: humanPlayer.id.replace('player-1',''),
-                     luduCoins: humanPlayer.coins,
-                     language: 'cs',
-                     questionHistory: state.questionHistory
-                 });
-             }
              return { ...state, players: action.payload };
 
         case 'PASS_BOT_TURN': {

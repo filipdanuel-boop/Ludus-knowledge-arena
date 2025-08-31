@@ -1,27 +1,8 @@
-
 import * as React from 'react';
-import { User, Language, Theme } from '../../types';
+import { User, Theme } from '../../types';
 import { themes } from '../../themes';
 import { NeonButton } from '../ui/NeonButton';
-import { INITIAL_COINS } from '../../constants';
-
-// Simple in-memory user store simulation using localStorage
-const userDB = {
-    getUser: (email: string) => {
-        const users = JSON.parse(localStorage.getItem('ludus_users') || '{}');
-        return users[email.toLowerCase()];
-    },
-    saveUser: (email: string, password: string): boolean => {
-        const users = JSON.parse(localStorage.getItem('ludus_users') || '{}');
-        const lowerEmail = email.toLowerCase();
-        if (users[lowerEmail]) {
-            return false; // User already exists
-        }
-        users[lowerEmail] = { password }; // In a real app, hash the password!
-        localStorage.setItem('ludus_users', JSON.stringify(users));
-        return true;
-    }
-};
+import * as userService from '../../services/userService';
 
 export const AuthScreen: React.FC<{ onLogin: (user: User) => void; themeConfig: typeof themes[Theme] }> = ({ onLogin, themeConfig }) => {
   const [authMode, setAuthMode] = React.useState<'login' | 'register'>('login');
@@ -44,24 +25,12 @@ export const AuthScreen: React.FC<{ onLogin: (user: User) => void; themeConfig: 
     }
     
     if (authMode === 'login') {
-        const existingUser = userDB.getUser(email);
-        if (!existingUser) {
-            setError("Uživatel s tímto emailem neexistuje.");
-            return;
+        const result = userService.loginUser(email, password);
+        if (result.success && result.user) {
+            onLogin(result.user);
+        } else {
+            setError(result.message);
         }
-        if (existingUser.password !== password) {
-            setError("Nesprávné heslo.");
-            return;
-        }
-
-        const storedHistory = localStorage.getItem(`ludus_history_${email.toLowerCase()}`) || '[]';
-        const questionHistory = JSON.parse(storedHistory);
-        const storedLang = (localStorage.getItem('ludus_language') as Language) || 'cs';
-        const storedCoins = localStorage.getItem(`ludus_coins_${email.toLowerCase()}`);
-        const luduCoins = storedCoins ? parseInt(storedCoins, 10) : INITIAL_COINS;
-
-        onLogin({ email: email.toLowerCase(), luduCoins, questionHistory, language: storedLang });
-
     } else { // Register mode
         if (password.length < 6) {
             setError("Heslo musí mít alespoň 6 znaků.");
@@ -72,21 +41,12 @@ export const AuthScreen: React.FC<{ onLogin: (user: User) => void; themeConfig: 
             return;
         }
         
-        const success = userDB.saveUser(email, password);
-        if (!success) {
-            setError("Uživatel s tímto emailem již existuje.");
-            return;
+        const result = userService.registerUser(email, password);
+        if (result.success && result.user) {
+            onLogin(result.user);
+        } else {
+            setError(result.message);
         }
-        
-        // Automatically log in after successful registration
-        const newUser: User = { 
-            email: email.toLowerCase(), 
-            luduCoins: INITIAL_COINS, 
-            questionHistory: [], 
-            language: 'cs'
-        };
-        localStorage.setItem(`ludus_coins_${email.toLowerCase()}`, String(INITIAL_COINS));
-        onLogin(newUser);
     }
   };
 

@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { User, Language, Theme } from '../../types';
 import { themes } from '../../themes';
@@ -6,7 +5,9 @@ import { NeonButton } from '../ui/NeonButton';
 import { OnlinePlayerCounter } from '../ui/OnlinePlayerCounter';
 import { LuduCoin } from '../ui/LuduCoin';
 import { generateLobbyIntro } from '../../services/geminiService';
-import { LANGUAGES } from '../../constants';
+import { LANGUAGES, DAILY_REWARD_COINS, WEEKLY_REWARD_COINS } from '../../constants';
+import * as userService from '../../services/userService';
+import { RewardNotification } from '../ui/RewardNotification';
 
 export const LobbyScreen: React.FC<{ 
     user: User;
@@ -19,6 +20,7 @@ export const LobbyScreen: React.FC<{
     themeConfig: typeof themes[Theme];
 }> = ({ user, setUser, onNavigate, onGetFreeCoins, onOpenThemeSelector, onLogout, appMetadata, themeConfig }) => {
     const [introText, setIntroText] = React.useState<string | null>(null);
+    const [reward, setReward] = React.useState<number | null>(null);
 
     React.useEffect(() => {
         const userName = user.email.split('@')[0];
@@ -31,15 +33,39 @@ export const LobbyScreen: React.FC<{
             setIntroText(defaultIntro);
         }
     }, [appMetadata, user.email]);
+    
+    React.useEffect(() => {
+        const today = new Date().toISOString().split('T')[0];
+        if (user.lastLoginDate !== today) {
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+            const newStreak = user.lastLoginDate === yesterdayStr ? user.loginStreak + 1 : 1;
+            const rewardAmount = newStreak % 7 === 0 ? WEEKLY_REWARD_COINS : DAILY_REWARD_COINS;
+
+            const updatedUser: User = {
+                ...user,
+                luduCoins: user.luduCoins + rewardAmount,
+                lastLoginDate: today,
+                loginStreak: newStreak,
+            };
+            userService.saveUserData(updatedUser);
+            setUser(updatedUser);
+            setReward(rewardAmount);
+        }
+    }, [user, setUser]);
 
     const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const newLang = e.target.value as Language;
-        setUser(u => u ? { ...u, language: newLang } : null);
-        localStorage.setItem('ludus_language', newLang);
+        const updatedUser = {...user, language: newLang };
+        setUser(updatedUser);
+        userService.saveUserData(updatedUser);
     };
 
     return (
         <div className="min-h-screen flex flex-col items-center justify-center p-4">
+            {reward && <RewardNotification amount={reward} onDismiss={() => setReward(null)} />}
             <div className="absolute top-4 left-4">
                 <button 
                     onClick={onOpenThemeSelector} 
@@ -51,13 +77,13 @@ export const LobbyScreen: React.FC<{
                 </button>
             </div>
             <div className={`absolute top-4 right-4 bg-gray-800/80 backdrop-blur-sm border ${themeConfig.accentBorder} p-3 rounded-lg flex items-center gap-4`}>
-                 <div className="flex flex-col text-right">
+                 <button onClick={() => onNavigate('PROFILE')} className="flex flex-col text-right hover:bg-gray-700/50 p-2 rounded-md transition-colors">
                     <p className={`${themeConfig.accentText} font-bold`}>{user.email}</p>
                     <div className="flex items-center gap-2 justify-end">
                         <LuduCoin themeConfig={themeConfig} className='w-5 h-5'/>
                         <p className="text-yellow-400 text-lg font-bold">{user.luduCoins.toLocaleString()}</p>
                     </div>
-                </div>
+                </button>
                 <select value={user.language} onChange={handleLanguageChange} className={`bg-gray-700 border ${themeConfig.accentBorder} text-white p-2 rounded focus:outline-none focus:ring-2 ${themeConfig.accentRing}`}>
                     {LANGUAGES.map(lang => (
                         <option key={lang.code} value={lang.code}>{lang.name}</option>
@@ -82,28 +108,24 @@ export const LobbyScreen: React.FC<{
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-3xl">
                 <div className="flex flex-col items-center">
                     <NeonButton onClick={() => onNavigate('GAME_SETUP')} themeConfig={themeConfig} className="w-full h-24 text-2xl">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                         Hrát Lokálně
                     </NeonButton>
                     <p className="text-gray-400 mt-2 text-center">Hrajte proti botům na jednom zařízení.</p>
                 </div>
                 <div className="flex flex-col items-center">
                     <NeonButton onClick={() => onNavigate('ONLINE_LOBBY')} themeConfig={themeConfig} className="w-full h-24 text-2xl">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2h10a2 2 0 002-2v-1a2 2 0 012-2h1.945M7.707 4.293a1 1 0 010 1.414L5.414 8l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L18.586 8l-2.293-2.293a1 1 0 010-1.414z" /></svg>
                         Hrát Online <span className="text-xs bg-rose-500 text-white px-2 py-1 rounded-full">BETA</span>
                     </NeonButton>
                     <p className="text-gray-400 mt-2 text-center">Vyzvěte ostatní hráče z celého světa.</p>
                 </div>
                 <div className="flex flex-col items-center">
                     <NeonButton onClick={onGetFreeCoins} variant="secondary" themeConfig={themeConfig} className="w-full h-24 text-2xl">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         Získat Coiny Zdarma
                     </NeonButton>
                     <p className="text-gray-400 mt-2 text-center">Sledujte reklamu a získejte odměnu.</p>
                 </div>
                 <div className="flex flex-col items-center">
                     <NeonButton onClick={() => onNavigate('RULES')} variant="secondary" themeConfig={themeConfig} className="w-full h-24 text-2xl">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
                         Pravidla
                     </NeonButton>
                     <p className="text-gray-400 mt-2 text-center">Naučte se, jak se stát šampionem.</p>

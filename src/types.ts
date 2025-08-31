@@ -49,10 +49,13 @@ export interface Field {
   maxHp: number;
 }
 
+export type QuestionDifficulty = 'easy' | 'medium' | 'hard';
+
 export interface Question {
   question: string;
   options?: string[]; // Optional for open-ended questions
   correctAnswer: string;
+  difficulty: QuestionDifficulty;
 }
 
 export type QuestionType = 'MULTIPLE_CHOICE' | 'OPEN_ENDED';
@@ -89,13 +92,27 @@ export interface GameState {
       attackerName: string;
   } | null;
   questionHistory: string[]; // History of questions for the current match
+  matchStats: Record<string, { correct: number, total: number, xpEarned: number, categories: Record<Category, { correct: number, total: number}> }>;
+}
+
+export interface UserStats {
+    totalCorrect: number;
+    totalAnswered: number;
+    answeredQuestions: string[];
+    categoryStats: Record<Category, {
+        totalCorrect: number;
+        totalAnswered: number;
+    }>;
 }
 
 export interface User {
   email: string;
   luduCoins: number;
-  questionHistory: string[]; // Global history of all questions asked
   language: Language;
+  xp: number;
+  stats: UserStats;
+  lastLoginDate: string; // YYYY-MM-DD
+  loginStreak: number;
 }
 
 
@@ -105,7 +122,7 @@ export type GameAction =
   | { type: 'SET_PHASE1_SELECTION'; payload: { playerId: string; fieldId: number } }
   | { type: 'SET_QUESTION'; payload: GameState['activeQuestion'] }
   | { type: 'CLEAR_QUESTION' }
-  | { type: 'SUBMIT_ANSWER'; payload: { playerId: string; answer: string } }
+  | { type: 'SUBMIT_ANSWER'; payload: { playerId: string; answer: string, category: Category } }
   | { type: 'RESOLVE_PHASE1_ROUND'; payload: { humanActionResult: 'win' | 'loss', fieldId: number } }
   | { type: 'RESOLVE_TURN'; payload?: { tieBreakerQuestion?: Question } }
   | { type: 'SET_ANSWER_FEEDBACK'; payload: GameState['answerResult'] }

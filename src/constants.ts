@@ -30,7 +30,7 @@ export const WIN_COINS_PER_PLAYER = 50;
 export const AD_REWARD_COINS = 150;
 export const SURRENDER_COIN_PENALTY = 100;
 export const ELIMINATION_COIN_BONUS = 100;
-export const EMAIL_VERIFICATION_BONUS = 500;
+export const REFERRAL_BONUS_COINS = 100;
 
 
 export const BASE_HP = 3;
@@ -41,7 +41,7 @@ export const POINTS = {
   ATTACK_WIN: 100,
   ATTACK_DAMAGE: 50,
   ATTACK_LOSS_ATTACKER: -75,
-  ATTACK_LOSS_DEFENDER: -50, // Defender also loses some points on a loss
+  ATTACK_LOSS_DEFENDER: -50,
   ATTACK_WIN_DEFENDER: 100,
   BLACK_FIELD_CLAIM: 200,
   BLACK_FIELD_FAIL: -150,
@@ -63,3 +63,11 @@ export const BOT_NAMES = [
     "ShadowStriker", "QuantumLeap", "Vortex", "Nebula", "CyberJaw", 
     "Pulse", "Ghost", "Echo", "Titan", "Viper", "Omega"
 ];
+
+// XP System
+export const XP_PER_CORRECT_ANSWER = 15;
+export const XP_FOR_WIN = 75;
+
+// Daily Rewards
+export const DAILY_REWARD_COINS = 50;
+export const WEEKLY_REWARD_COINS = 100;

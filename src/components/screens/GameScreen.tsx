@@ -1,13 +1,13 @@
-
 import * as React from 'react';
-import { GameState, User, Theme, Player, Category, GamePhase } from '../../types';
+import { GameState, User, Theme, Player, Category, GamePhase, QuestionDifficulty } from '../../types';
 import { themes } from '../../themes';
 import { GameAction } from '../../types';
 import { generateQuestion, generateOpenEndedQuestion } from '../../services/geminiService';
-import { CATEGORIES, PHASE_DURATIONS, WIN_COINS_PER_PLAYER } from '../../constants';
-import { normalizeAnswer } from '../../utils';
+// FIX: Added HINT_COSTS to imports to resolve reference errors.
+import { CATEGORIES, PHASE_DURATIONS, WIN_COINS_PER_PLAYER, XP_FOR_WIN, HINT_COSTS } from '../../constants';
+import * as userService from '../../services/userService';
 import { decideBotAction, getAttackers } from '../../services/gameLogic';
-
+import { normalizeAnswer } from '../../utils';
 
 // Import Game Components
 import { GameOverScreen } from '../game/GameOverScreen';
@@ -38,7 +38,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
     const botTurnTimeoutRef = React.useRef<number | null>(null);
     const logicTimeoutRef = React.useRef<number | null>(null);
     
-    // Game Timer Effect
     React.useEffect(() => {
         const timer = setInterval(() => {
             if (gameState.gamePhase !== GamePhase.GameOver) {
@@ -53,6 +52,13 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
         setBoardRotation(prev => (prev + angle + 360) % 360);
     };
 
+    const getQuestionWithDifficulty = async (category: Category, difficulty: QuestionDifficulty) => {
+        setIsProcessingQuestion(true);
+        const question = await generateQuestion(category, difficulty, gameState.questionHistory, user.language);
+        setIsProcessingQuestion(false);
+        return question;
+    };
+    
     const handleFieldClick = async (fieldId: number) => {
         if (isProcessingQuestion || gameState.activeQuestion) return;
         
@@ -63,9 +69,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
             if (gameState.phase1Selections?.[humanPlayer.id] != null || Object.values(gameState.phase1Selections || {}).includes(fieldId)) return;
             if (field.type === 'NEUTRAL' && !field.ownerId) {
                 dispatch({ type: 'SET_PHASE1_SELECTION', payload: { playerId: humanPlayer.id, fieldId }});
-                setIsProcessingQuestion(true);
-                const question = await generateQuestion(field.category!, gameState.questionHistory, user.language);
-                setIsProcessingQuestion(false);
+                const question = await getQuestionWithDifficulty(field.category!, 'easy');
                 if (question) {
                     dispatch({ type: 'SET_QUESTION', payload: { question, questionType: 'MULTIPLE_CHOICE', targetFieldId: fieldId, attackerId: humanPlayer.id, isBaseAttack: false, isTieBreaker: false, playerAnswers: { [humanPlayer.id]: null }, startTime: Date.now(), actionType: 'ATTACK' } });
                 }
@@ -75,9 +79,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
             if (currentPlayer.isBot || currentPlayer.id !== humanPlayer.id || !getAttackers(gameState.players).some(p => p.id === currentPlayer.id)) return;
     
             if (field.ownerId === currentPlayer.id && field.type === 'PLAYER_BASE' && field.hp < field.maxHp) {
-                 setIsProcessingQuestion(true);
-                 const question = await generateQuestion(field.category!, gameState.questionHistory, user.language);
-                 setIsProcessingQuestion(false);
+                 const question = await getQuestionWithDifficulty(field.category!, 'medium');
                  if (question) {
                      dispatch({ type: 'SET_QUESTION', payload: { question, questionType: 'MULTIPLE_CHOICE', targetFieldId: fieldId, attackerId: currentPlayer.id, isBaseAttack: false, isTieBreaker: false, actionType: 'HEAL', playerAnswers: { [currentPlayer.id]: null }, startTime: Date.now() } });
                  }
@@ -85,10 +87,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
             }
     
             if (field.type === 'BLACK') {
-                setIsProcessingQuestion(true);
                 const randomCategory = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
-                const question = await generateQuestion(randomCategory, gameState.questionHistory, user.language);
-                setIsProcessingQuestion(false);
+                const question = await getQuestionWithDifficulty(randomCategory, 'hard');
                 if (question) {
                      dispatch({ type: 'SET_QUESTION', payload: { question, questionType: 'MULTIPLE_CHOICE', targetFieldId: fieldId, attackerId: currentPlayer.id, isBaseAttack: false, isTieBreaker: false, actionType: 'ATTACK', playerAnswers: { [currentPlayer.id]: null }, startTime: Date.now() } });
                 }
@@ -101,14 +101,14 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
     const handleCategorySelect = async (category: Category) => {
         if (!attackTarget) return;
         const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
-        
+        const { targetFieldId, defenderId, isBaseAttack } = attackTarget;
+
         setAttackTarget(null);
-        setIsProcessingQuestion(true);
-        const question = await generateQuestion(category, gameState.questionHistory, user.language);
-        setIsProcessingQuestion(false);
+        
+        const difficulty: QuestionDifficulty = isBaseAttack ? 'hard' : 'medium';
+        const question = await getQuestionWithDifficulty(category, difficulty);
     
         if (question) {
-            const { targetFieldId, defenderId, isBaseAttack } = attackTarget;
             const playerAnswers: Record<string, null> = { [currentPlayer.id]: null };
             if (defenderId) playerAnswers[defenderId] = null;
     
@@ -122,7 +122,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
         if(logicTimeoutRef.current) clearTimeout(logicTimeoutRef.current);
 
         const humanPlayer = gameState.players.find(p => !p.isBot)!;
-        dispatch({ type: 'SUBMIT_ANSWER', payload: { playerId: humanPlayer.id, answer } });
+        const field = gameState.board.find(f => f.id === gameState.activeQuestion!.targetFieldId)!;
+        dispatch({ type: 'SUBMIT_ANSWER', payload: { playerId: humanPlayer.id, answer, category: field.category! } });
 
         const updatedActiveQuestion = { ...gameState.activeQuestion, playerAnswers: { ...gameState.activeQuestion.playerAnswers, [humanPlayer.id]: answer } };
         const allPlayersAnswered = Object.values(updatedActiveQuestion.playerAnswers).every(ans => ans !== null);
@@ -137,8 +138,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
     const handleUseHint = () => {
         if (!gameState.activeQuestion) return;
         const humanPlayer = gameState.players.find(p => !p.isBot)!;
-        if (humanPlayer.coins >= 500) {
-            dispatch({ type: 'UPDATE_PLAYERS', payload: gameState.players.map(p => p.id === humanPlayer.id ? {...p, coins: p.coins - 500} : p) });
+        if (humanPlayer.coins >= HINT_COSTS.AUTO_ANSWER) {
+            dispatch({ type: 'UPDATE_PLAYERS', payload: gameState.players.map(p => p.id === humanPlayer.id ? {...p, coins: p.coins - HINT_COSTS.AUTO_ANSWER} : p) });
             handleAnswer(gameState.activeQuestion.question.correctAnswer);
         }
     };
@@ -154,7 +155,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
         }
 
         const { action, targetField, category } = decision;
-        const question = await generateQuestion(category!, gameState.questionHistory, 'cs');
+        const difficulty: QuestionDifficulty = targetField?.type === 'PLAYER_BASE' ? 'hard' : 'medium';
+        const question = await generateQuestion(category!, difficulty, gameState.questionHistory, 'cs');
         
         if (!question) {
             dispatch({ type: 'PASS_BOT_TURN', payload: { botId: bot.id, reason: "Chyba při generování otázky." }});
@@ -178,17 +180,14 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
             actionType: action as 'ATTACK' | 'HEAL'
         }});
 
-        // Bot submits its answer immediately
-        dispatch({ type: 'SUBMIT_ANSWER', payload: { playerId: bot.id, answer: Math.random() < 0.7 ? question.correctAnswer : "wrong" } });
+        dispatch({ type: 'SUBMIT_ANSWER', payload: { playerId: bot.id, answer: Math.random() < 0.7 ? question.correctAnswer : "wrong", category: category! } });
 
-        // If defender is human, wait for their answer. Otherwise, resolve immediately.
         if (defender && !defender.isBot) {
-            // Human will answer via UI, which will trigger RESOLVE_TURN
+            // Human will answer via UI
         } else {
             if (defender && defender.isBot) {
-                 dispatch({ type: 'SUBMIT_ANSWER', payload: { playerId: defender.id, answer: Math.random() < 0.6 ? question.correctAnswer : "wrong_2" } });
+                 dispatch({ type: 'SUBMIT_ANSWER', payload: { playerId: defender.id, answer: Math.random() < 0.6 ? question.correctAnswer : "wrong_2", category: category! } });
             }
-            // Use timeout to give a feeling of action
             setTimeout(() => dispatch({ type: 'RESOLVE_TURN' }), 2000);
         }
     }, [gameState, dispatch]);
@@ -196,16 +195,13 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
 
     // --- GAME FLOW EFFECTS ---
     
-    // Effect to handle resolving Phase 1 after human player answers
     React.useEffect(() => {
         if (gameState.gamePhase === GamePhase.Phase1_LandGrab && gameState.answerResult) {
             const humanPlayer = gameState.players.find(p => !p.isBot)!;
-            // Check if it's the human player's result we're seeing
             if (gameState.answerResult.playerId === humanPlayer.id && gameState.activeQuestion) {
                 const fieldId = gameState.activeQuestion.targetFieldId;
                 const result = gameState.answerResult.isCorrect ? 'win' : 'loss';
                 
-                // Use a short timeout to allow the feedback modal to show
                 const timeoutId = setTimeout(() => {
                     dispatch({ type: 'RESOLVE_PHASE1_ROUND', payload: { humanActionResult: result, fieldId } });
                 }, 2000); 
@@ -216,7 +212,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
     }, [gameState.gamePhase, gameState.answerResult, gameState.activeQuestion, gameState.players, dispatch]);
 
 
-    // Effect to handle Phase 1 bot selections
     React.useEffect(() => {
         if (gameState.gamePhase === GamePhase.Phase1_LandGrab) {
             const humanPlayer = gameState.players.find(p => !p.isBot)!;
@@ -235,22 +230,21 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
         }
     }, [gameState.gamePhase, gameState.phase1Selections, gameState.players, dispatch]);
 
-    // Effect for tie-breakers
     React.useEffect(() => {
         if(logicTimeoutRef.current) clearTimeout(logicTimeoutRef.current);
 
         const triggerTiebreaker = async () => {
             if (gameState.activeQuestion?.isTieBreaker === false && gameState.activeQuestion.defenderId) {
-                const { attackerId, defenderId, question } = gameState.activeQuestion;
-                const attacker = gameState.players.find(p => p.id === attackerId)!;
-                const defender = gameState.players.find(p => p.id === defenderId)!;
+                const { attackerId, defenderId, question, targetFieldId } = gameState.activeQuestion;
                 const isAttackerCorrect = normalizeAnswer(gameState.activeQuestion.playerAnswers[attackerId] || '') === normalizeAnswer(question.correctAnswer);
                 const isDefenderCorrect = normalizeAnswer(gameState.activeQuestion.playerAnswers[defenderId] || '') === normalizeAnswer(question.correctAnswer);
                 
                 if (isAttackerCorrect && isDefenderCorrect) {
                      setIsProcessingQuestion(true);
+                     const defender = gameState.players.find(p => p.id === defenderId)!;
                      const langForTiebreaker = defender.isBot ? 'cs' : user.language;
-                     const tieBreakerQuestion = await generateOpenEndedQuestion(gameState.board.find(f => f.id === gameState.activeQuestion!.targetFieldId)!.category!, gameState.questionHistory, langForTiebreaker);
+                     const category = gameState.board.find(f => f.id === targetFieldId)!.category!;
+                     const tieBreakerQuestion = await generateOpenEndedQuestion(category, 'hard', gameState.questionHistory, langForTiebreaker);
                      setIsProcessingQuestion(false);
                      dispatch({ type: 'RESOLVE_TURN', payload: { tieBreakerQuestion }});
                 } else {
@@ -265,7 +259,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
 
     }, [gameState.activeQuestion, gameState.players, user.language, dispatch]);
 
-    // Effect for bot turn logic
     React.useEffect(() => {
         if (botTurnTimeoutRef.current) clearTimeout(botTurnTimeoutRef.current);
         if (gameState.gamePhase === GamePhase.Phase2_Attacks && !gameState.activeQuestion && !isProcessingQuestion && !gameState.answerResult && !gameState.eliminationResult) {
@@ -277,21 +270,41 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
         return () => { if (botTurnTimeoutRef.current) clearTimeout(botTurnTimeoutRef.current); };
     }, [gameState, isProcessingQuestion, handleBotAttackTurn]);
 
-    // Effect to update user coins at game end
     React.useEffect(() => {
         if (gameState.gamePhase === GamePhase.GameOver) {
             const humanPlayer = gameState.players.find(p => !p.isBot);
-            if (!humanPlayer) return;
+            if (!humanPlayer || !user) return;
+    
+            const matchStats = gameState.matchStats[humanPlayer.id];
             const isWinner = gameState.winners?.some(w => w.id === humanPlayer.id) ?? false;
-            let finalCoins = humanPlayer.coins;
-            if (isWinner) finalCoins += (gameState.players.length - 1) * WIN_COINS_PER_PLAYER;
             
-            const finalUser = { ...user, luduCoins: finalCoins };
-            setUser(finalUser);
-            // Save coins to localStorage for persistence
-            localStorage.setItem(`ludus_coins_${user.email}`, String(finalCoins));
+            let finalXp = user.xp + (matchStats.xpEarned || 0);
+
+            const finalCoins = humanPlayer.coins + (isWinner ? (gameState.players.length - 1) * WIN_COINS_PER_PLAYER : 0);
+
+            const updatedStats = { ...user.stats };
+            updatedStats.totalCorrect += matchStats.correct;
+            updatedStats.totalAnswered += matchStats.total;
+            
+            for(const category of Object.values(Category)){
+                if(updatedStats.categoryStats[category] && matchStats.categories[category]) {
+                    updatedStats.categoryStats[category].totalCorrect += matchStats.categories[category].correct;
+                    updatedStats.categoryStats[category].totalAnswered += matchStats.categories[category].total;
+                }
+            }
+            
+            const updatedUser: User = { 
+                ...user, 
+                luduCoins: finalCoins, 
+                xp: finalXp,
+                stats: updatedStats
+            };
+            
+            userService.saveUserData(updatedUser);
+            setUser(updatedUser);
         }
-    }, [gameState.gamePhase, gameState.players, gameState.winners, setUser, user]);
+    }, [gameState.gamePhase, gameState.players, gameState.winners, gameState.matchStats, user, setUser]);
+    
 
     const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
     const humanPlayer = gameState.players.find(p => !p.isBot)!;

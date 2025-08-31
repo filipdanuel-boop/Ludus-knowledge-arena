@@ -1,13 +1,11 @@
-
-
 import { GoogleGenAI, Type } from "@google/genai";
-import type { Question, Language, Category } from '../types';
+import type { Question, Language, Category, QuestionDifficulty } from '../types';
 import { questionBank } from './questionBank';
 import { normalizeAnswer } from '../utils';
 
-// DŮLEŽITÉ: Pro nasazení na Vercel musíte nastavit proměnnou prostředí s názvem 'API_KEY'.
-// Jděte do nastavení vašeho projektu -> Settings -> Environment Variables a přidejte ji.
 // FIX: Switched to process.env.API_KEY to align with coding guidelines and resolve TypeScript error.
+// DŮLEŽITÉ: Pro nasazení na Vercel musíte nastavit proměnou prostředí s názvem 'API_KEY'.
+// Jděte do nastavení vašeho projektu -> Settings -> Environment Variables a přidejte ji.
 const apiKey = process.env.API_KEY;
 
 let ai: GoogleGenAI | null = null;
@@ -17,27 +15,37 @@ if (apiKey) {
     console.warn("API_KEY is not set. Gemini features will be disabled.");
 }
 
-const getQuestionFromBank = (category: Category, history: string[]): Question | null => {
-    const categoryQuestions = questionBank[category]?.multipleChoice;
-    if (!categoryQuestions || categoryQuestions.length === 0) return null;
+const getQuestionsFromBank = (category: Category, difficulty: QuestionDifficulty, type: 'multipleChoice' | 'openEnded'): Question[] => {
+    const categoryBank = questionBank[category];
+    if (!categoryBank) return [];
+    
+    const typeBank = categoryBank[type];
+    if(!typeBank) return [];
 
-    const availableQuestions = categoryQuestions.filter(q => !history.includes(q.question));
+    return typeBank[difficulty] || [];
+}
+
+const getQuestionFromBank = (category: Category, difficulty: QuestionDifficulty, history: string[]): Question | null => {
+    const allQuestions = getQuestionsFromBank(category, difficulty, 'multipleChoice');
+    if (allQuestions.length === 0) return null;
+
+    const availableQuestions = allQuestions.filter(q => !history.includes(q.question));
     if (availableQuestions.length > 0) {
         return availableQuestions[Math.floor(Math.random() * availableQuestions.length)];
     }
-    // Fallback to all questions if all have been used
-    return categoryQuestions[Math.floor(Math.random() * categoryQuestions.length)];
+    // Fallback if all have been used
+    return allQuestions[Math.floor(Math.random() * allQuestions.length)];
 };
 
-const getOpenEndedQuestionFromBank = (category: Category, history: string[]): Question | null => {
-    const categoryQuestions = questionBank[category]?.openEnded;
-    if (!categoryQuestions || categoryQuestions.length === 0) return null;
+const getOpenEndedQuestionFromBank = (category: Category, difficulty: QuestionDifficulty, history: string[]): Question | null => {
+    const allQuestions = getQuestionsFromBank(category, difficulty, 'openEnded');
+    if (allQuestions.length === 0) return null;
     
-    const availableQuestions = categoryQuestions.filter(q => !history.includes(q.question));
+    const availableQuestions = allQuestions.filter(q => !history.includes(q.question));
      if (availableQuestions.length > 0) {
         return availableQuestions[Math.floor(Math.random() * availableQuestions.length)];
     }
-    return categoryQuestions[Math.floor(Math.random() * categoryQuestions.length)];
+    return allQuestions[Math.floor(Math.random() * allQuestions.length)];
 };
 
 const translateQuestionPayload = async (question: Question, targetLang: Language): Promise<Question> => {
@@ -82,6 +90,7 @@ ${JSON.stringify(sourceObject, null, 2)}`;
         const translatedObject = JSON.parse(cleanedJson);
 
         const finalQuestion: Question = {
+            ...question,
             question: translatedObject.question || question.question,
             correctAnswer: translatedObject.correctAnswer || question.correctAnswer,
             options: translatedObject.options || question.options
@@ -96,18 +105,18 @@ ${JSON.stringify(sourceObject, null, 2)}`;
 
     } catch (error) {
         console.error("Chyba při překladu celé otázky:", error);
-        return question; // Fallback to original question
+        return question;
     }
 };
 
-export const generateQuestion = async (category: Category, history: string[], targetLang: Language): Promise<Question | null> => {
-    const baseQuestion = getQuestionFromBank(category, history);
+export const generateQuestion = async (category: Category, difficulty: QuestionDifficulty, history: string[], targetLang: Language): Promise<Question | null> => {
+    const baseQuestion = getQuestionFromBank(category, difficulty, history);
     if (!baseQuestion) return null;
     return translateQuestionPayload(baseQuestion, targetLang);
 };
 
-export const generateOpenEndedQuestion = async (category: Category, history: string[], targetLang: Language): Promise<Question | null> => {
-    const baseQuestion = getOpenEndedQuestionFromBank(category, history);
+export const generateOpenEndedQuestion = async (category: Category, difficulty: QuestionDifficulty, history: string[], targetLang: Language): Promise<Question | null> => {
+    const baseQuestion = getOpenEndedQuestionFromBank(category, difficulty, history);
     if (!baseQuestion) return null;
     return translateQuestionPayload(baseQuestion, targetLang);
 };
