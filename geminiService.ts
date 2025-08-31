@@ -1,15 +1,16 @@
 import { GoogleGenAI } from "@google/genai";
 import type { Question, Language, Category } from '../types';
 import { questionBank } from './questionBank';
+import { normalizeAnswer } from '../utils';
 
-const getApiKey = (): string | undefined => {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-        console.warn("API klíč pro Gemini není nastaven. Překlady a generování úvodu budou deaktivovány.");
-        return undefined;
-    }
-    return apiKey;
-};
+// FIX: Per Gemini guidelines, the API key must come from process.env.API_KEY and the client should be initialized once.
+// This also resolves the TypeScript error related to 'import.meta.env'.
+const apiKey = process.env.API_KEY;
+const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
+
+if (!ai) {
+    console.warn("API klíč pro Gemini (API_KEY) není nastaven. Překlady a generování úvodu budou deaktivovány.");
+}
 
 const getQuestionFromBank = (category: Category, history: string[]): Question | null => {
     const categoryQuestions = questionBank[category]?.multipleChoice;
@@ -34,16 +35,9 @@ const getOpenEndedQuestionFromBank = (category: Category, history: string[]): Qu
     return categoryQuestions[Math.floor(Math.random() * categoryQuestions.length)];
 };
 
-const normalizeAnswer = (answer: string): string => {
-    if (typeof answer !== 'string') return '';
-    return answer.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-};
-
 const translateQuestionPayload = async (question: Question, targetLang: Language): Promise<Question> => {
-    const apiKey = getApiKey();
-    if (!apiKey || targetLang === 'cs') return question;
-
-    const ai = new GoogleGenAI({ apiKey });
+    // FIX: Use the shared 'ai' instance and check for its existence.
+    if (!ai || targetLang === 'cs') return question;
 
     const sourceObject: any = {
         question: question.question,
@@ -65,7 +59,7 @@ ${JSON.stringify(sourceObject, null, 2)}`;
             contents: prompt,
             config: { temperature: 0.1, responseMimeType: "application/json" }
         });
-
+        
         const cleanedJson = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
         const translatedObject = JSON.parse(cleanedJson);
 
@@ -75,6 +69,7 @@ ${JSON.stringify(sourceObject, null, 2)}`;
             options: translatedObject.options || question.options
         };
 
+        // Ensure correctAnswer matches one of the translated options exactly
         if (finalQuestion.options && Array.isArray(finalQuestion.options)) {
             const correctOption = finalQuestion.options.find(opt => normalizeAnswer(opt) === normalizeAnswer(finalQuestion.correctAnswer));
             finalQuestion.correctAnswer = correctOption || finalQuestion.correctAnswer;
@@ -101,14 +96,13 @@ export const generateOpenEndedQuestion = async (category: Category, history: str
 };
 
 export const generateLobbyIntro = async (appName: string, appDescription: string, userName: string): Promise<string | null> => {
-    const apiKey = getApiKey();
     const defaultIntro = `Vítej v aréně, ${userName}! Dokaž své znalosti ve hře ${appName} a dobyj území. Hodně štěstí!`;
-    if (!apiKey) {
+    // FIX: Use the shared 'ai' instance and check for its existence.
+    if (!ai) {
         return defaultIntro;
     }
     
     try {
-        const ai = new GoogleGenAI({ apiKey });
         const prompt = `Jsi AI hostitel hry s názvem '${appName}'. Popis hry je: '${appDescription}'. Napiš krátký, energický a přátelský pozdrav pro hráče jménem '${userName}', který ho vítá v lobby. Zmiň se stručně o tom, že se jedná o souboj vědomostí a dobývání území. Buď stručný (maximálně 2-3 věty) a mluv česky.`;
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',

@@ -97,3 +97,21 @@ export interface User {
   questionHistory: string[]; // Global history of all questions asked
   language: Language;
 }
+
+
+// --- Game Reducer Actions ---
+export type GameAction =
+  | { type: 'INITIALIZE_GAME'; payload: { playerCount: number; user: User, isOnlineMode?: boolean } }
+  | { type: 'SET_PHASE1_SELECTION'; payload: { playerId: string; fieldId: number } }
+  | { type: 'SET_QUESTION'; payload: GameState['activeQuestion'] }
+  | { type: 'CLEAR_QUESTION' }
+  | { type: 'SUBMIT_ANSWER'; payload: { playerId: string; answer: string } }
+  | { type: 'RESOLVE_PHASE1_ROUND'; payload: { humanActionResult: 'win' | 'loss', fieldId: number } }
+  | { type: 'RESOLVE_TURN'; payload?: { tieBreakerQuestion?: Question } }
+  | { type: 'SET_ANSWER_FEEDBACK'; payload: GameState['answerResult'] }
+  | { type: 'CLEAR_ANSWER_FEEDBACK' }
+  | { type: 'SET_ELIMINATION_FEEDBACK'; payload: GameState['eliminationResult'] }
+  | { type: 'CLEAR_ELIMINATION_FEEDBACK' }
+  | { type: 'UPDATE_PLAYERS'; payload: Player[] }
+  | { type: 'PASS_BOT_TURN'; payload: { botId: string; reason: string } }
+  | { type: 'SET_STATE'; payload: Partial<GameState> };
