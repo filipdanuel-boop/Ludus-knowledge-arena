@@ -1,8 +1,8 @@
 import * as React from 'react';
-import { Theme } from '../../types';
-import { themes } from '../../App';
-import { Modal } from '../ui/Modal';
-import { NeonButton } from '../ui/NeonButton';
+import { Theme } from '../../types.ts';
+import { themes } from '../../App.tsx';
+import { Modal } from '../ui/Modal.tsx';
+import { NeonButton } from '../ui/NeonButton.tsx';
 
 interface ThemeSelectionModalProps {
     isOpen: boolean;

@@ -1,12 +1,12 @@
 import * as React from 'react';
-import { GameState, Player, Theme } from '../../types';
-import { themes } from '../../App';
-import { Modal } from '../ui/Modal';
-import { Spinner } from '../ui/Spinner';
-import { NeonButton } from '../ui/NeonButton';
-import { LuduCoin } from '../ui/LuduCoin';
-import { TimerUI } from './TimerUI';
-import { HINT_COSTS } from '../../constants';
+import { GameState, Player, Theme } from '../../types.ts';
+import { themes } from '../../App.tsx';
+import { Modal } from '../ui/Modal.tsx';
+import { Spinner } from '../ui/Spinner.tsx';
+import { NeonButton } from '../ui/NeonButton.tsx';
+import { LuduCoin } from '../ui/LuduCoin.tsx';
+import { TimerUI } from './TimerUI.tsx';
+import { HINT_COSTS } from '../../constants.ts';
 
 const ANSWER_TIME_LIMIT = 15;
 

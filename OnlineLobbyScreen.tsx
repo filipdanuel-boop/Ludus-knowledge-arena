@@ -1,8 +1,8 @@
 import * as React from 'react';
-import { Theme } from '../../types';
-import { themes } from '../../App';
-import { NeonButton } from '../ui/NeonButton';
-import { PLAYER_COLOR_HEX } from '../../constants';
+import { Theme } from '../../types.ts';
+import { themes } from '../../App.tsx';
+import { NeonButton } from '../ui/NeonButton.tsx';
+import { PLAYER_COLOR_HEX } from '../../constants.ts';
 
 export const OnlineLobbyScreen: React.FC<{ onStartGame: (playerCount: number) => void; onBack: () => void; themeConfig: typeof themes[Theme] }> = ({ onStartGame, onBack, themeConfig }) => (
     <div className="min-h-screen flex flex-col items-center justify-center p-4">

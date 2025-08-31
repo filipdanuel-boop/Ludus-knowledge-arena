@@ -1,7 +1,7 @@
 import * as React from 'react';
-import { Player, Field, FieldType, Theme } from '../../types';
-import { themes } from '../../App';
-import { LuduCoin } from '../ui/LuduCoin';
+import { Player, Field, FieldType, Theme } from '../../types.ts';
+import { themes } from '../../App.tsx';
+import { LuduCoin } from '../ui/LuduCoin.tsx';
 
 export const PlayerStatusUI: React.FC<{ players: Player[], currentPlayerId: string, board: Field[], themeConfig: typeof themes[Theme] }> = ({ players, currentPlayerId, board, themeConfig }) => {
     return (

@@ -1,7 +1,7 @@
 import * as React from 'react';
-import { Theme } from '../../types';
-import { themes } from '../../App';
-import { Spinner } from '../ui/Spinner';
+import { Theme } from '../../types.ts';
+import { themes } from '../../App.tsx';
+import { Spinner } from '../ui/Spinner.tsx';
 
 export const FindingMatchScreen: React.FC<{ playerCount: number; onMatchFound: () => void; themeConfig: typeof themes[Theme] }> = ({ playerCount, onMatchFound, themeConfig }) => {
     const [elapsed, setElapsed] = React.useState(0);

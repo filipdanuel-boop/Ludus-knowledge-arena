@@ -1,10 +1,10 @@
 import { GoogleGenAI } from "@google/genai";
-import type { Question, Language, Category } from '../types';
-import { questionBank } from './questionBank';
-import { normalizeAnswer } from '../utils';
+import type { Question, Language, Category } from '../types.ts';
+import { questionBank } from './questionBank.ts';
+import { normalizeAnswer } from '../utils.ts';
 
-// FIX: Per Gemini guidelines, the API key must come from process.env.API_KEY and the client should be initialized once.
-// This also resolves the TypeScript error related to 'import.meta.env'.
+// Přístup k API klíči přes process.env.API_KEY je standardní způsob,
+// který Vercel podporuje pro proměnné prostředí.
 const apiKey = process.env.API_KEY;
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
@@ -36,7 +36,6 @@ const getOpenEndedQuestionFromBank = (category: Category, history: string[]): Qu
 };
 
 const translateQuestionPayload = async (question: Question, targetLang: Language): Promise<Question> => {
-    // FIX: Use the shared 'ai' instance and check for its existence.
     if (!ai || targetLang === 'cs') return question;
 
     const sourceObject: any = {
@@ -97,7 +96,6 @@ export const generateOpenEndedQuestion = async (category: Category, history: str
 
 export const generateLobbyIntro = async (appName: string, appDescription: string, userName: string): Promise<string | null> => {
     const defaultIntro = `Vítej v aréně, ${userName}! Dokaž své znalosti ve hře ${appName} a dobyj území. Hodně štěstí!`;
-    // FIX: Use the shared 'ai' instance and check for its existence.
     if (!ai) {
         return defaultIntro;
     }

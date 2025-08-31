@@ -1,6 +1,6 @@
-import { GameState, GameAction, Player, Field, GamePhase, FieldType, Category, User, Question } from '../types';
-import { CATEGORIES, PLAYER_COLORS, BASE_HP, FIELD_HP, BOT_NAMES, POINTS, PHASE_DURATIONS, ELIMINATION_COIN_BONUS } from '../constants';
-import { normalizeAnswer } from '../utils';
+import { GameState, GameAction, Player, Field, GamePhase, FieldType, Category, User, Question } from '../types.ts';
+import { CATEGORIES, PLAYER_COLORS, BASE_HP, FIELD_HP, BOT_NAMES, POINTS, PHASE_DURATIONS, ELIMINATION_COIN_BONUS } from '../constants.ts';
+import { normalizeAnswer } from '../utils.ts';
 
 export const createInitialGameState = (playerCount: number, user: User, isOnlineMode: boolean = false): GameState => {
     const players: Player[] = Array.from({ length: playerCount }, (_, i) => {
@@ -76,7 +76,7 @@ export const createInitialGameState = (playerCount: number, user: User, isOnline
     };
 };
 
-const getAttackers = (players: Player[]): Player[] => {
+export const getAttackers = (players: Player[]): Player[] => {
     const activePlayers = players.filter(p => !p.isEliminated);
     if (activePlayers.length <= 1) return [];
     
@@ -86,148 +86,214 @@ const getAttackers = (players: Player[]): Player[] => {
     return sortedPlayers.slice(0, attackerCount);
 };
 
-const resolveTurn = (state: GameState, tieBreakerQuestion?: Question): GameState => {
-    let newState = JSON.parse(JSON.stringify(state));
-    if (!newState.activeQuestion) return newState;
+// --- Bot Decision Making ---
+export const decideBotAction = (gameState: GameState): { action: 'HEAL' | 'ATTACK' | 'PASS', targetField?: Field, category?: Category, reason?: string } => {
+    const bot = gameState.players[gameState.currentTurnPlayerIndex];
+    const botBase = gameState.board.find(f => f.ownerId === bot.id && f.type === 'PLAYER_BASE');
 
-    const { attackerId, defenderId, targetFieldId, playerAnswers, question, actionType, isBaseAttack } = newState.activeQuestion;
+    // Heal decision
+    if (botBase && botBase.hp < botBase.maxHp && (botBase.hp === 1 || Math.random() < 0.5)) {
+        return { action: 'HEAL', targetField: botBase, category: botBase.category! };
+    }
     
-    const attacker = newState.players.find((p: Player) => p.id === attackerId);
-    const field = newState.board.find((f: Field) => f.id === targetFieldId);
-    let elimination: { eliminatedPlayerName: string, attackerName: string } | null = null;
+    // Attack decision
+    const validTargets = gameState.board.filter(f => f.ownerId !== bot.id && f.type !== 'NEUTRAL');
+    if (validTargets.length === 0) {
+        return { action: 'PASS', reason: "Nebyly nalezeny žádné platné cíle." };
+    }
+
+    const targetField = validTargets[Math.floor(Math.random() * validTargets.length)];
+    const isBaseAttack = targetField.type === 'PLAYER_BASE';
+    let category: Category;
+
+    if (isBaseAttack) {
+        category = targetField.category!;
+    } else if (targetField.type === 'BLACK') {
+        category = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
+    } else {
+        const availableCategories = CATEGORIES.filter(c => !bot.usedAttackCategories.includes(c));
+        if (availableCategories.length === 0) { 
+            return { action: 'PASS', reason: "Vyčerpány kategorie." }; 
+        }
+        category = availableCategories[Math.floor(Math.random() * availableCategories.length)];
+    }
+
+    return { action: 'ATTACK', targetField, category };
+};
+
+
+// --- Turn Resolution Logic ---
+
+const handleHealAction = (state: GameState) => {
+    const { attackerId, targetFieldId, playerAnswers, question } = state.activeQuestion!;
+    const attacker = state.players.find(p => p.id === attackerId)!;
+    const field = state.board.find(f => f.id === targetFieldId)!;
+    const isCorrect = normalizeAnswer(playerAnswers[attackerId] || "") === normalizeAnswer(question.correctAnswer);
+
+    if (isCorrect) {
+        field.hp = Math.min(field.maxHp, field.hp + 1);
+        attacker.score += POINTS.HEAL_SUCCESS;
+        state.gameLog.push(`${attacker.name} si úspěšně opravil základnu.`);
+    } else {
+        attacker.score += POINTS.HEAL_FAIL_PENALTY;
+        state.gameLog.push(`${attacker.name} neuspěl při opravě.`);
+    }
+    return state;
+};
+
+const handleAttackAction = (state: GameState, tieBreakerQuestion?: Question) => {
+    const { attackerId, defenderId, targetFieldId, playerAnswers, question, isBaseAttack } = state.activeQuestion!;
+    const attacker = state.players.find(p => p.id === attackerId)!;
+    const field = state.board.find(f => f.id === targetFieldId)!;
     
-    const attackerAnswer = playerAnswers[attackerId];
-    const isAttackerCorrect = normalizeAnswer(attackerAnswer || "") === normalizeAnswer(question.correctAnswer);
-    
+    // Handle player vs player combat
     if (defenderId) {
-        const defenderAnswer = playerAnswers[defenderId];
-        const isDefenderCorrect = normalizeAnswer(defenderAnswer || "") === normalizeAnswer(question.correctAnswer);
-        
-        if (isAttackerCorrect && isDefenderCorrect && !isBaseAttack && !newState.activeQuestion.isTieBreaker) {
+        const defender = state.players.find(p => p.id === defenderId)!;
+        const isAttackerCorrect = normalizeAnswer(playerAnswers[attackerId] || "") === normalizeAnswer(question.correctAnswer);
+        const isDefenderCorrect = normalizeAnswer(playerAnswers[defenderId] || "") === normalizeAnswer(question.correctAnswer);
+
+        // Check for Tie-Breaker condition
+        if (isAttackerCorrect && isDefenderCorrect && !isBaseAttack && !state.activeQuestion!.isTieBreaker) {
             if (tieBreakerQuestion) {
-                 newState.activeQuestion = {
-                    ...newState.activeQuestion,
+                 state.activeQuestion = {
+                    ...state.activeQuestion!,
                     question: tieBreakerQuestion,
                     questionType: 'OPEN_ENDED',
                     isTieBreaker: true,
                     playerAnswers: { [attackerId]: null, [defenderId]: null },
                     startTime: Date.now(),
                  };
-                 newState.questionHistory.push(tieBreakerQuestion.question);
-                 newState.gameLog.push(`ROZSTŘEL mezi ${attacker.name} a ${newState.players.find((p:Player) => p.id === defenderId).name}!`);
-                 return newState;
-            } else {
-                 newState.gameLog.push("Chyba při generování rozstřelu, kolo končí remízou.");
+                 state.questionHistory.push(tieBreakerQuestion.question);
+                 state.gameLog.push(`ROZSTŘEL mezi ${attacker.name} a ${defender.name}!`);
+                 return state; // Return early, don't resolve turn yet
             }
         }
-    }
-    
-    if (actionType === 'HEAL') {
+        
+        // Resolve combat
+        if (isAttackerCorrect && (!isDefenderCorrect || isBaseAttack)) { // Attacker wins
+            field.hp -= 1;
+            if (isBaseAttack) {
+                attacker.score += POINTS.ATTACK_DAMAGE;
+                state.gameLog.push(`${attacker.name} zasáhl základnu hráče ${defender.name}!`);
+            } else {
+                field.ownerId = attackerId;
+                field.hp = field.maxHp;
+                attacker.score += POINTS.ATTACK_WIN;
+                defender.score += POINTS.ATTACK_LOSS_DEFENDER;
+                state.gameLog.push(`${attacker.name} dobyl území od hráče ${defender.name}!`);
+            }
+        } else if (!isAttackerCorrect && isDefenderCorrect) { // Defender wins
+            attacker.score += POINTS.ATTACK_LOSS_ATTACKER;
+            if (!isBaseAttack) defender.score += POINTS.ATTACK_WIN_DEFENDER;
+            state.gameLog.push(`${defender.name} ubránil své území.`);
+        } else { // Both wrong or other cases
+            attacker.score += POINTS.ATTACK_LOSS_ATTACKER;
+            state.gameLog.push(`Útok hráče ${attacker.name} se nezdařil.`);
+        }
+    } else { // Handle attacking neutral/black field
+        const isAttackerCorrect = normalizeAnswer(playerAnswers[attackerId] || "") === normalizeAnswer(question.correctAnswer);
         if (isAttackerCorrect) {
-            field.hp = Math.min(field.maxHp, field.hp + 1);
-            attacker.score += POINTS.HEAL_SUCCESS;
-            newState.gameLog.push(`${attacker.name} si úspěšně opravil základnu.`);
+            field.ownerId = attackerId;
+            field.type = FieldType.Neutral;
+            field.hp = field.maxHp;
+            attacker.score += POINTS.BLACK_FIELD_CLAIM;
+            state.gameLog.push(`${attacker.name} zabral černé území!`);
         } else {
-            attacker.score += POINTS.HEAL_FAIL_PENALTY;
-            newState.gameLog.push(`${attacker.name} neuspěl při opravě.`);
-        }
-    } else if (actionType === 'ATTACK') {
-         if (defenderId) {
-            const defender = newState.players.find((p: Player) => p.id === defenderId);
-            const defenderAnswer = playerAnswers[defenderId];
-            const isDefenderCorrect = normalizeAnswer(defenderAnswer || "") === normalizeAnswer(question.correctAnswer);
-            
-            if (isAttackerCorrect && (!isDefenderCorrect || isBaseAttack)) {
-                field.hp -= 1;
-                if (isBaseAttack) {
-                    attacker.score += POINTS.ATTACK_DAMAGE;
-                    newState.gameLog.push(`${attacker.name} zasáhl základnu hráče ${defender.name}!`);
-                } else {
-                    field.ownerId = attackerId;
-                    field.hp = field.maxHp;
-                    attacker.score += POINTS.ATTACK_WIN;
-                    defender.score += POINTS.ATTACK_LOSS_DEFENDER;
-                    newState.gameLog.push(`${attacker.name} dobyl území od hráče ${defender.name}!`);
-                }
-            } else if (!isAttackerCorrect && isDefenderCorrect) {
-                attacker.score += POINTS.ATTACK_LOSS_ATTACKER;
-                if (!isBaseAttack) defender.score += POINTS.ATTACK_WIN_DEFENDER;
-                newState.gameLog.push(`${defender.name} ubránil své území.`);
-            } else {
-                attacker.score += POINTS.ATTACK_LOSS_ATTACKER;
-                newState.gameLog.push(`Útok hráče ${attacker.name} se nezdařil.`);
-            }
-            
-            if (field.hp <= 0) {
-                field.ownerId = attackerId;
-                field.hp = field.maxHp;
-                if (isBaseAttack) {
-                    attacker.score += POINTS.BASE_DESTROY_BONUS + Math.max(0, defender.score);
-                    attacker.coins += ELIMINATION_COIN_BONUS;
-                    defender.score = 0;
-                    defender.isEliminated = true;
-                    elimination = { eliminatedPlayerName: defender.name, attackerName: attacker.name };
-                    newState.gameLog.push(`${attacker.name} ZNIČIL základnu hráče ${defender.name}!`);
-                    newState.board.forEach((f: Field) => { if (f.ownerId === defender.id) f.ownerId = attacker.id; });
-                }
-            }
-        } else { // Attacking black field
-            if (isAttackerCorrect) {
-                field.ownerId = attackerId;
-                field.type = FieldType.Neutral;
-                field.hp = field.maxHp;
-                attacker.score += POINTS.BLACK_FIELD_CLAIM;
-                newState.gameLog.push(`${attacker.name} zabral černé území!`);
-            } else {
-                attacker.score += POINTS.BLACK_FIELD_FAIL;
-                newState.gameLog.push(`${attacker.name} neuspěl na černém území.`);
-            }
+            attacker.score += POINTS.BLACK_FIELD_FAIL;
+            state.gameLog.push(`${attacker.name} neuspěl na černém území.`);
         }
     }
+    return state;
+};
+
+const checkForEliminations = (state: GameState): GameState => {
+    const { attackerId, targetFieldId, isBaseAttack } = state.activeQuestion!;
+    const attacker = state.players.find(p => p.id === attackerId)!;
+    const field = state.board.find(f => f.id === targetFieldId)!;
     
-    newState.players.forEach((p: Player) => {
-        if (p.score < 0 && !state.players.find(op => op.id === p.id)!.isEliminated) {
+    // Check for base destruction elimination
+    if (isBaseAttack && field.hp <= 0) {
+        const defender = state.players.find(p => p.id === field.ownerId)!;
+        attacker.score += POINTS.BASE_DESTROY_BONUS + Math.max(0, defender.score);
+        attacker.coins += ELIMINATION_COIN_BONUS;
+        defender.score = 0;
+        defender.isEliminated = true;
+        state.eliminationResult = { eliminatedPlayerName: defender.name, attackerName: attacker.name };
+        state.gameLog.push(`${attacker.name} ZNIČIL základnu hráče ${defender.name}!`);
+        state.board.forEach(f => { if (f.ownerId === defender.id) f.ownerId = attacker.id; });
+    }
+
+    // Check for negative score elimination for all players
+    state.players.forEach(p => {
+        if (!p.isEliminated && p.score < 0) {
             p.isEliminated = true;
-            elimination = { eliminatedPlayerName: p.name, attackerName: 'Záporné skóre' };
-            newState.gameLog.push(`${p.name} byl vyřazen kvůli záporným bodům!`);
-            newState.board.forEach((f: Field) => {
+            state.eliminationResult = { eliminatedPlayerName: p.name, attackerName: 'Záporné skóre' };
+            state.gameLog.push(`${p.name} byl vyřazen kvůli záporným bodům!`);
+            state.board.forEach(f => {
                 if (f.ownerId === p.id && f.type !== FieldType.PlayerBase) { f.ownerId = null; f.type = FieldType.Black; }
             });
         }
     });
 
-    const activePlayers = newState.players.filter((p: Player) => !p.isEliminated);
+    return state;
+};
+
+const advanceTurnAndRound = (state: GameState): GameState => {
+    const activePlayers = state.players.filter(p => !p.isEliminated);
     if (activePlayers.length <= 1) {
-        newState.gamePhase = GamePhase.GameOver;
-        newState.winners = activePlayers;
-    } else {
-        const currentAttackers = getAttackers(newState.players);
-        const currentAttackerInListIndex = currentAttackers.findIndex(p => p.id === attackerId);
-        
-        if (currentAttackerInListIndex === -1 || currentAttackerInListIndex === currentAttackers.length - 1 || currentAttackers.length === 0) {
-            newState.round += 1;
-            if (newState.round > PHASE_DURATIONS.PHASE2_ROUNDS) {
-                newState.gamePhase = GamePhase.GameOver;
-                const highestScore = Math.max(...activePlayers.map(p => p.score));
-                newState.winners = activePlayers.filter(p => p.score === highestScore);
-            } else {
-                const nextRoundAttackers = getAttackers(newState.players);
-                if (nextRoundAttackers.length > 0) {
-                    newState.currentTurnPlayerIndex = newState.players.findIndex((p: Player) => p.id === nextRoundAttackers[0].id);
-                } else {
-                     newState.gamePhase = GamePhase.GameOver;
-                     newState.winners = activePlayers;
-                }
-            }
-        } else {
-            const nextAttacker = currentAttackers[currentAttackerInListIndex + 1];
-            newState.currentTurnPlayerIndex = newState.players.findIndex((p: Player) => p.id === nextAttacker.id);
-        }
+        state.gamePhase = GamePhase.GameOver;
+        state.winners = activePlayers;
+        return state;
     }
+
+    const currentAttackers = getAttackers(state.players);
+    const currentAttacker = state.players[state.currentTurnPlayerIndex];
+    const currentAttackerInListIndex = currentAttackers.findIndex(p => p.id === currentAttacker.id);
+
+    // If the current player wasn't an attacker, or was the last one, advance the round
+    if (currentAttackerInListIndex === -1 || currentAttackerInListIndex === currentAttackers.length - 1 || currentAttackers.length === 0) {
+        state.round += 1;
+        if (state.round > PHASE_DURATIONS.PHASE2_ROUNDS) {
+            state.gamePhase = GamePhase.GameOver;
+            const highestScore = Math.max(...activePlayers.map(p => p.score));
+            state.winners = activePlayers.filter(p => p.score === highestScore);
+        } else {
+            const nextRoundAttackers = getAttackers(state.players);
+            if (nextRoundAttackers.length > 0) {
+                state.currentTurnPlayerIndex = state.players.findIndex(p => p.id === nextRoundAttackers[0].id);
+            } else { // No one can attack, game ends
+                 state.gamePhase = GamePhase.GameOver;
+                 state.winners = activePlayers;
+            }
+        }
+    } else { // Move to the next attacker in the current list
+        const nextAttacker = currentAttackers[currentAttackerInListIndex + 1];
+        state.currentTurnPlayerIndex = state.players.findIndex(p => p.id === nextAttacker.id);
+    }
+
+    return state;
+};
+
+
+const resolveTurn = (state: GameState, tieBreakerQuestion?: Question): GameState => {
+    let newState = JSON.parse(JSON.stringify(state));
+    if (!newState.activeQuestion) return newState;
+
+    const { actionType } = newState.activeQuestion;
+    
+    if (actionType === 'HEAL') {
+        newState = handleHealAction(newState);
+    } else if (actionType === 'ATTACK') {
+        newState = handleAttackAction(newState, tieBreakerQuestion);
+        // If a tie-breaker was set, return early without advancing the turn
+        if(newState.activeQuestion?.isTieBreaker) return newState;
+    }
+
+    newState = checkForEliminations(newState);
+    newState = advanceTurnAndRound(newState);
     
     newState.activeQuestion = null;
     newState.answerResult = null;
-    if (elimination) newState.eliminationResult = elimination;
 
     return newState;
 }
@@ -341,19 +407,10 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
             if (!state) return state;
             let newState = JSON.parse(JSON.stringify(state));
             const { botId, reason } = action.payload;
-            const bot = newState.players.find((p: Player) => p.id === botId);
+            const bot = newState.players.find((p: Player) => p.id === botId)!;
             newState.gameLog.push(`${bot.name} (Bot) přeskakuje tah: ${reason}`);
             
-            const currentAttackers = getAttackers(newState.players);
-            const currentAttackerInListIndex = currentAttackers.findIndex(p => p.id === botId);
-            if (currentAttackerInListIndex === -1 || currentAttackerInListIndex === currentAttackers.length - 1 || currentAttackers.length === 0) {
-                newState.round += 1;
-                const nextRoundAttackers = getAttackers(newState.players);
-                if(nextRoundAttackers.length > 0) newState.currentTurnPlayerIndex = newState.players.findIndex((p: Player) => p.id === nextRoundAttackers[0].id);
-            } else {
-                 const nextAttacker = currentAttackers[currentAttackerInListIndex + 1];
-                newState.currentTurnPlayerIndex = newState.players.findIndex((p: Player) => p.id === nextAttacker.id);
-            }
+            newState = advanceTurnAndRound(newState);
             return newState;
         }
 

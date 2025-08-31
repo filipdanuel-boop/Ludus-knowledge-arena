@@ -1,8 +1,8 @@
 import * as React from 'react';
-import { User, Language, Theme } from '../../types';
-import { themes } from '../../App';
-import { NeonButton } from '../ui/NeonButton';
-import { INITIAL_COINS, EMAIL_VERIFICATION_BONUS } from '../../constants';
+import { User, Language, Theme } from '../../types.ts';
+import { themes } from '../../App.tsx';
+import { NeonButton } from '../ui/NeonButton.tsx';
+import { INITIAL_COINS, EMAIL_VERIFICATION_BONUS } from '../../constants.ts';
 
 export const AuthScreen: React.FC<{ onLogin: (user: User) => void; themeConfig: typeof themes[Theme] }> = ({ onLogin, themeConfig }) => {
   const [authMode, setAuthMode] = React.useState<'login' | 'register' | 'verify'>('login');

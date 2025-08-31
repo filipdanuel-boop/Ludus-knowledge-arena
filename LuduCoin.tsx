@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { Theme } from '../../types';
-import { themes } from '../../App';
+import { Theme } from '../../types.ts';
+import { themes } from '../../App.tsx';
 
 export const LuduCoin: React.FC<{ className?: string; themeConfig: typeof themes[Theme] }> = ({ className = "w-6 h-6", themeConfig }) => (
     <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">

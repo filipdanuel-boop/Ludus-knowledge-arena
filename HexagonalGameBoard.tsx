@@ -1,17 +1,8 @@
 import * as React from 'react';
-import { Field, Player, GamePhase, FieldType, GameState, Theme } from '../../types';
-import { PLAYER_COLOR_HEX } from '../../constants';
-import { themes } from '../../App';
-
-export const getAttackers = (players: Player[]): Player[] => {
-    const activePlayers = players.filter(p => !p.isEliminated);
-    if (activePlayers.length <= 1) return [];
-    
-    const sortedPlayers = [...activePlayers].sort((a, b) => a.score - b.score);
-    const attackerCount = Math.max(1, Math.floor(sortedPlayers.length / 2));
-    
-    return sortedPlayers.slice(0, attackerCount);
-};
+import { Field, Player, GamePhase, FieldType, GameState, Theme } from '../../types.ts';
+import { PLAYER_COLOR_HEX } from '../../constants.ts';
+import { themes } from '../../App.tsx';
+import { getAttackers } from '../../services/gameLogic.ts';
 
 interface HexagonalGameBoardProps {
     gameState: GameState;
@@ -120,6 +111,7 @@ export const HexagonalGameBoard: React.FC<HexagonalGameBoardProps> = ({ gameStat
                     </filter>
                 </defs>
                 {allFields.map(field => {
+                    // FIX: Changed `f.r` to `field.r` to correctly reference the field object from the map callback.
                     const { x, y } = getHexPosition(field.q, field.r);
                     const { fill, stroke, strokeWidth, cursor, filter, isDisabled } = getFieldStyle(field);
                     return (

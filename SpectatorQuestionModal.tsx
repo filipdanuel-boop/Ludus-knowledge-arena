@@ -1,7 +1,7 @@
 import * as React from 'react';
-import { GameState, Theme } from '../../types';
-import { themes } from '../../App';
-import { Modal } from '../ui/Modal';
+import { GameState, Theme } from '../../types.ts';
+import { themes } from '../../App.tsx';
+import { Modal } from '../ui/Modal.tsx';
 
 export const SpectatorQuestionModal: React.FC<{ activeQuestion: GameState['activeQuestion'] | null; themeConfig: typeof themes[Theme] }> = ({ activeQuestion, themeConfig }) => {
     if (!activeQuestion) return null;

@@ -1,4 +1,4 @@
-import { Category, Question } from '../types';
+import { Category, Question } from '../types.ts';
 
 type QuestionBank = {
   [key in Category]: {

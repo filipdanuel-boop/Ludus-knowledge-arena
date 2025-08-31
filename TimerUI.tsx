@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { Theme } from '../../types';
-import { themes } from '../../App';
+import { Theme } from '../../types.ts';
+import { themes } from '../../App.tsx';
 
 export const TimerUI: React.FC<{ startTime: number, timeLimit: number, onTimeout: () => void, themeConfig: typeof themes[Theme] }> = ({ startTime, timeLimit, onTimeout, themeConfig }) => {
     const [timeLeft, setTimeLeft] = React.useState(timeLimit);

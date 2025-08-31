@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { GameState, Theme } from '../../types';
-import { themes } from '../../App';
+import { GameState, Theme } from '../../types.ts';
+import { themes } from '../../App.tsx';
 
 export const AnswerFeedbackModal: React.FC<{ result: GameState['answerResult']; onClear: () => void; themeConfig: typeof themes[Theme] }> = ({ result, onClear, themeConfig }) => {
     

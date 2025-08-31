@@ -1,11 +1,11 @@
 import * as React from 'react';
-import { User, Language, Theme } from '../../types';
-import { themes } from '../../App';
-import { NeonButton } from '../ui/NeonButton';
-import { OnlinePlayerCounter } from '../ui/OnlinePlayerCounter';
-import { LuduCoin } from '../ui/LuduCoin';
-import { generateLobbyIntro } from '../../services/geminiService';
-import { LANGUAGES } from '../../constants';
+import { User, Language, Theme } from '../../types.ts';
+import { themes } from '../../App.tsx';
+import { NeonButton } from '../ui/NeonButton.tsx';
+import { OnlinePlayerCounter } from '../ui/OnlinePlayerCounter.tsx';
+import { LuduCoin } from '../ui/LuduCoin.tsx';
+import { generateLobbyIntro } from '../../services/geminiService.ts';
+import { LANGUAGES } from '../../constants.ts';
 
 export const LobbyScreen: React.FC<{ 
     user: User;

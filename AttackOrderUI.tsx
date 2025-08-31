@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { Player, Theme } from '../../types';
-import { themes } from '../../App';
+import { Player, Theme } from '../../types.ts';
+import { themes } from '../../App.tsx';
 
 export const AttackOrderUI: React.FC<{ attackers: Player[], currentPlayerId: string, themeConfig: typeof themes[Theme] }> = ({ attackers, currentPlayerId, themeConfig }) => {
     if (attackers.length === 0) return null;

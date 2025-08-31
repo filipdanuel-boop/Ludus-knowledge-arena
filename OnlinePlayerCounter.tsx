@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { Theme } from '../../types';
-import { themes } from '../../App';
+import { Theme } from '../../types.ts';
+import { themes } from '../../App.tsx';
 
 export const OnlinePlayerCounter: React.FC<{ themeConfig: typeof themes[Theme] }> = ({ themeConfig }) => {
     const [count, setCount] = React.useState(Math.floor(Math.random() * (1200 - 800 + 1)) + 800);

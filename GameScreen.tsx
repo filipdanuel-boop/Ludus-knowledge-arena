@@ -1,22 +1,23 @@
 import * as React from 'react';
-import { GameState, User, Theme, Player, Category, GamePhase } from '../../types';
-import { themes } from '../../App';
-import { GameAction } from '../../types';
-import { generateQuestion, generateOpenEndedQuestion } from '../../services/geminiService';
-import { CATEGORIES, PHASE_DURATIONS, WIN_COINS_PER_PLAYER } from '../../constants';
-// FIX: Import normalizeAnswer to resolve the 'Cannot find name' error.
-import { normalizeAnswer } from '../../utils';
+import { GameState, User, Theme, Player, Category, GamePhase } from '../../types.ts';
+import { themes } from '../../App.tsx';
+import { GameAction } from '../../types.ts';
+import { generateQuestion, generateOpenEndedQuestion } from '../../services/geminiService.ts';
+import { CATEGORIES, PHASE_DURATIONS, WIN_COINS_PER_PLAYER } from '../../constants.ts';
+import { normalizeAnswer } from '../../utils.ts';
+import { decideBotAction, getAttackers } from '../../services/gameLogic.ts';
+
 
 // Import Game Components
-import { GameOverScreen } from '../game/GameOverScreen';
-import { HexagonalGameBoard, getAttackers } from '../game/HexagonalGameBoard';
-import { PlayerStatusUI } from '../game/PlayerStatusUI';
-import { AttackOrderUI } from '../game/AttackOrderUI';
-import { QuestionModal } from '../game/QuestionModal';
-import { SpectatorQuestionModal } from '../game/SpectatorQuestionModal';
-import { CategorySelectionModal } from '../game/CategorySelectionModal';
-import { AnswerFeedbackModal } from '../game/AnswerFeedbackModal';
-import { EliminationFeedbackModal } from '../game/EliminationFeedbackModal';
+import { GameOverScreen } from '../game/GameOverScreen.tsx';
+import { HexagonalGameBoard } from '../game/HexagonalGameBoard.tsx';
+import { PlayerStatusUI } from '../game/PlayerStatusUI.tsx';
+import { AttackOrderUI } from '../game/AttackOrderUI.tsx';
+import { QuestionModal } from '../game/QuestionModal.tsx';
+import { SpectatorQuestionModal } from '../game/SpectatorQuestionModal.tsx';
+import { CategorySelectionModal } from '../game/CategorySelectionModal.tsx';
+import { AnswerFeedbackModal } from '../game/AnswerFeedbackModal.tsx';
+import { EliminationFeedbackModal } from '../game/EliminationFeedbackModal.tsx';
 
 interface GameScreenProps {
     gameState: GameState;
@@ -144,58 +145,50 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
     // --- BOT LOGIC ---
     const handleBotAttackTurn = React.useCallback(async () => {
         const bot = gameState.players[gameState.currentTurnPlayerIndex];
-        const botBase = gameState.board.find(f => f.ownerId === bot.id && f.type === 'PLAYER_BASE');
+        const decision = decideBotAction(gameState);
 
-        if (botBase && botBase.hp < botBase.maxHp && (botBase.hp === 1 || Math.random() < 0.5)) {
-            const question = await generateQuestion(botBase.category!, gameState.questionHistory, 'cs');
-            if(question) {
-                dispatch({ type: 'SET_QUESTION', payload: {
-                    question, questionType: 'MULTIPLE_CHOICE', targetFieldId: botBase.id, attackerId: bot.id, actionType: 'HEAL', isBaseAttack: false, isTieBreaker: false, playerAnswers: { [bot.id]: null }, startTime: Date.now()
-                }});
-                dispatch({ type: 'SUBMIT_ANSWER', payload: { playerId: bot.id, answer: Math.random() < 0.8 ? question.correctAnswer : "wrong" }});
-                dispatch({ type: 'RESOLVE_TURN' });
-                return;
-            }
-        }
-        
-        const validTargets = gameState.board.filter(f => f.ownerId !== bot.id && f.type !== 'NEUTRAL');
-        if (validTargets.length === 0) {
-            dispatch({ type: 'PASS_BOT_TURN', payload: { botId: bot.id, reason: "Nebyly nalezeny žádné platné cíle." }});
+        if (decision.action === 'PASS') {
+            dispatch({ type: 'PASS_BOT_TURN', payload: { botId: bot.id, reason: decision.reason! }});
             return;
         }
 
-        const targetField = validTargets[Math.floor(Math.random() * validTargets.length)];
-        const isBaseAttack = targetField.type === 'PLAYER_BASE';
-        const defender = gameState.players.find(p => p.id === targetField.ownerId);
-        let category: Category;
-
-        if (isBaseAttack) category = targetField.category!;
-        else if (targetField.type === 'BLACK') category = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
-        else {
-            const availableCategories = CATEGORIES.filter(c => !bot.usedAttackCategories.includes(c));
-            if (availableCategories.length === 0) { dispatch({ type: 'PASS_BOT_TURN', payload: { botId: bot.id, reason: "Vyčerpány kategorie." }}); return; }
-            category = availableCategories[Math.floor(Math.random() * availableCategories.length)];
+        const { action, targetField, category } = decision;
+        const question = await generateQuestion(category!, gameState.questionHistory, 'cs');
+        
+        if (!question) {
+            dispatch({ type: 'PASS_BOT_TURN', payload: { botId: bot.id, reason: "Chyba při generování otázky." }});
+            return;
         }
 
-        const question = await generateQuestion(category, gameState.questionHistory, 'cs');
-        if (!question) { dispatch({ type: 'PASS_BOT_TURN', payload: { botId: bot.id, reason: "Chyba při generování otázky." }}); return; }
-
+        const defender = action === 'ATTACK' ? gameState.players.find(p => p.id === targetField!.ownerId) : undefined;
         const playerAnswers: Record<string, string | null> = { [bot.id]: null };
-        if(defender) playerAnswers[defender.id] = null;
-        
+        if (defender) playerAnswers[defender.id] = null;
+
         dispatch({ type: 'SET_QUESTION', payload: {
-            question, questionType: 'MULTIPLE_CHOICE', targetFieldId: targetField.id, attackerId: bot.id, defenderId: defender?.id, isBaseAttack, isTieBreaker: false, playerAnswers, startTime: Date.now(), actionType: 'ATTACK'
+            question,
+            questionType: 'MULTIPLE_CHOICE',
+            targetFieldId: targetField!.id,
+            attackerId: bot.id,
+            defenderId: defender?.id,
+            isBaseAttack: targetField!.type === 'PLAYER_BASE',
+            isTieBreaker: false,
+            playerAnswers,
+            startTime: Date.now(),
+            actionType: action as 'ATTACK' | 'HEAL'
         }});
-        
+
+        // Bot submits its answer immediately
         dispatch({ type: 'SUBMIT_ANSWER', payload: { playerId: bot.id, answer: Math.random() < 0.7 ? question.correctAnswer : "wrong" } });
 
+        // If defender is human, wait for their answer. Otherwise, resolve immediately.
         if (defender && !defender.isBot) {
-            // Wait for human player to answer
+            // Human will answer via UI, which will trigger RESOLVE_TURN
         } else {
             if (defender && defender.isBot) {
                  dispatch({ type: 'SUBMIT_ANSWER', payload: { playerId: defender.id, answer: Math.random() < 0.6 ? question.correctAnswer : "wrong_2" } });
             }
-            dispatch({ type: 'RESOLVE_TURN' });
+            // Use timeout to give a feeling of action
+            setTimeout(() => dispatch({ type: 'RESOLVE_TURN' }), 1000);
         }
     }, [gameState, dispatch]);
 

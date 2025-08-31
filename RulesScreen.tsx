@@ -1,8 +1,8 @@
 import * as React from 'react';
-import { Theme } from '../../types';
-import { themes } from '../../App';
-import { NeonButton } from '../ui/NeonButton';
-import { PLAYER_COLOR_HEX } from '../../constants';
+import { Theme } from '../../types.ts';
+import { themes } from '../../App.tsx';
+import { NeonButton } from '../ui/NeonButton.tsx';
+import { PLAYER_COLOR_HEX } from '../../constants.ts';
 
 export const RulesScreen: React.FC<{ onBack: () => void; themeConfig: typeof themes[Theme] }> = ({ onBack, themeConfig }) => {
     return (

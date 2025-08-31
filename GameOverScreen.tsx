@@ -1,10 +1,10 @@
 import * as React from 'react';
-import { GameState, Theme } from '../../types';
-import { themes } from '../../App';
-import { Modal } from '../ui/Modal';
-import { NeonButton } from '../ui/NeonButton';
-import { LuduCoin } from '../ui/LuduCoin';
-import { WIN_COINS_PER_PLAYER } from '../../constants';
+import { GameState, Theme } from '../../types.ts';
+import { themes } from '../../App.tsx';
+import { Modal } from '../ui/Modal.tsx';
+import { NeonButton } from '../ui/NeonButton.tsx';
+import { LuduCoin } from '../ui/LuduCoin.tsx';
+import { WIN_COINS_PER_PLAYER } from '../../constants.ts';
 
 export const GameOverScreen: React.FC<{ gameState: GameState; onBackToLobby: () => void; themeConfig: typeof themes[Theme] }> = ({ gameState, onBackToLobby, themeConfig }) => {
     const { winners } = gameState;

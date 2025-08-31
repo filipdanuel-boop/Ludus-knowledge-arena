@@ -1,23 +1,22 @@
 import * as React from 'react';
 import { Analytics } from '@vercel/analytics/react';
-// FIX: Import GamePhase to correctly type the game state reset.
-import { User, Theme, GamePhase } from './types';
-import { AD_REWARD_COINS, INITIAL_COINS } from './constants';
-import { gameReducer } from './services/gameLogic';
+import { User, Theme, GamePhase } from './types.ts';
+import { AD_REWARD_COINS, INITIAL_COINS } from './constants.ts';
+import { gameReducer } from './services/gameLogic.ts';
 
 // Import screen components
-import { AuthScreen } from './components/screens/AuthScreen';
-import { LobbyScreen } from './components/screens/LobbyScreen';
-import { OnlineLobbyScreen } from './components/screens/OnlineLobbyScreen';
-import { FindingMatchScreen } from './components/screens/FindingMatchScreen';
-import { GameSetupScreen } from './components/screens/GameSetupScreen';
-import { RulesScreen } from './components/screens/RulesScreen';
-import { GameScreen } from './components/screens/GameScreen';
+import { AuthScreen } from './components/screens/AuthScreen.tsx';
+import { LobbyScreen } from './components/screens/LobbyScreen.tsx';
+import { OnlineLobbyScreen } from './components/screens/OnlineLobbyScreen.tsx';
+import { FindingMatchScreen } from './components/screens/FindingMatchScreen.tsx';
+import { GameSetupScreen } from './components/screens/GameSetupScreen.tsx';
+import { RulesScreen } from './components/screens/RulesScreen.tsx';
+import { GameScreen } from './components/screens/GameScreen.tsx';
 
 // Import UI components
-import { AdRewardModal } from './components/game/AdRewardModal';
-import { ThemeSelectionModal } from './components/game/ThemeSelectionModal';
-import { Spinner } from './components/ui/Spinner';
+import { AdRewardModal } from './components/game/AdRewardModal.tsx';
+import { ThemeSelectionModal } from './components/game/ThemeSelectionModal.tsx';
+import { Spinner } from './components/ui/Spinner.tsx';
 
 export const themes: Record<Theme, {
     name: string;
@@ -146,7 +145,6 @@ export default function App() {
   };
 
   const handleBackToLobby = () => {
-      // FIX: Use the GamePhase enum member instead of a string literal to match the type definition.
       dispatch({ type: 'SET_STATE', payload: { gamePhase: GamePhase.Setup }}); // Reset game state
       setScreen('LOBBY');
   };

@@ -1,10 +1,10 @@
 import * as React from 'react';
-import { Theme } from '../../types';
-import { themes } from '../../App';
-import { Modal } from '../ui/Modal';
-import { NeonButton } from '../ui/NeonButton';
-import { LuduCoin } from '../ui/LuduCoin';
-import { AD_REWARD_COINS } from '../../constants';
+import { Theme } from '../../types.ts';
+import { themes } from '../../App.tsx';
+import { Modal } from '../ui/Modal.tsx';
+import { NeonButton } from '../ui/NeonButton.tsx';
+import { LuduCoin } from '../ui/LuduCoin.tsx';
+import { AD_REWARD_COINS } from '../../constants.ts';
 
 
 export const AdRewardModal: React.FC<{ onClaim: () => void; themeConfig: typeof themes[Theme] }> = ({ onClaim, themeConfig }) => (
