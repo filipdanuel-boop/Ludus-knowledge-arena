@@ -1,6 +1,7 @@
+
 import * as React from 'react';
 import { GameState, Player, Theme } from '../../types';
-import { themes } from '../../App';
+import { themes } from '../../themes';
 import { Modal } from '../ui/Modal';
 import { Spinner } from '../ui/Spinner';
 import { NeonButton } from '../ui/NeonButton';

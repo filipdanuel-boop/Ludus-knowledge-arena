@@ -1,6 +1,7 @@
+
 import * as React from 'react';
 import { Theme } from '../../types';
-import { themes } from '../../App';
+import { themes } from '../../themes';
 import { NeonButton } from '../ui/NeonButton';
 import { PLAYER_COLOR_HEX } from '../../constants';
 

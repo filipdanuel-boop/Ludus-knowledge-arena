@@ -1,6 +1,7 @@
+
 import * as React from 'react';
 import { Theme } from '../../types';
-import { themes } from '../../App';
+import { themes } from '../../themes';
 
 export const Modal: React.FC<{ children: React.ReactNode; isOpen: boolean; themeConfig: typeof themes[Theme] }> = ({ children, isOpen, themeConfig }) => {
   if (!isOpen) return null;

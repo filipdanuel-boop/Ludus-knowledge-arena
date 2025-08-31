@@ -1,11 +1,12 @@
+
 import * as React from 'react';
 import { GameState, Theme } from '../../types';
-import { themes } from '../../App';
+import { themes } from '../../themes';
 
 export const EliminationFeedbackModal: React.FC<{ result: GameState['eliminationResult']; onClear: () => void; themeConfig: typeof themes[Theme] }> = ({ result, onClear, themeConfig }) => {
     
     React.useEffect(() => {
-        const timer = setTimeout(onClear, 3000);
+        const timer = setTimeout(onClear, 2000);
         return () => clearTimeout(timer);
     }, [onClear]);
 

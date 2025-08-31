@@ -1,6 +1,7 @@
+
 import * as React from 'react';
 import { GameState, User, Theme, Player, Category, GamePhase } from '../../types';
-import { themes } from '../../App';
+import { themes } from '../../themes';
 import { GameAction } from '../../types';
 import { generateQuestion, generateOpenEndedQuestion } from '../../services/geminiService';
 import { CATEGORIES, PHASE_DURATIONS, WIN_COINS_PER_PLAYER } from '../../constants';
@@ -188,7 +189,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
                  dispatch({ type: 'SUBMIT_ANSWER', payload: { playerId: defender.id, answer: Math.random() < 0.6 ? question.correctAnswer : "wrong_2" } });
             }
             // Use timeout to give a feeling of action
-            setTimeout(() => dispatch({ type: 'RESOLVE_TURN' }), 1000);
+            setTimeout(() => dispatch({ type: 'RESOLVE_TURN' }), 2000);
         }
     }, [gameState, dispatch]);
 
@@ -207,7 +208,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
                 // Use a short timeout to allow the feedback modal to show
                 const timeoutId = setTimeout(() => {
                     dispatch({ type: 'RESOLVE_PHASE1_ROUND', payload: { humanActionResult: result, fieldId } });
-                }, 1500); 
+                }, 2000); 
 
                 return () => clearTimeout(timeoutId);
             }

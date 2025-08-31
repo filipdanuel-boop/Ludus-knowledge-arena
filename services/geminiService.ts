@@ -1,13 +1,16 @@
+
+
 // FIX: Import 'Type' for using responseSchema.
 import { GoogleGenAI, Type } from "@google/genai";
 import type { Question, Language, Category } from '../types';
 import { questionBank } from './questionBank';
 import { normalizeAnswer } from '../utils';
 
-// FIX: Per coding guidelines, the API key must be retrieved from `process.env.API_KEY`. This also resolves the TypeScript error.
+// FIX: Switched to process.env.API_KEY to align with coding guidelines and resolve TypeScript error.
 // DŮLEŽITÉ: Pro nasazení na Vercel musíte nastavit proměnnou prostředí s názvem 'API_KEY'.
-// Jděte do nastavení vašeho projektu -> Environment Variables a přidejte ji.
+// Jděte do nastavení vašeho projektu -> Settings -> Environment Variables a přidejte ji.
 const apiKey = process.env.API_KEY;
+
 if (!apiKey) {
     console.warn("API_KEY is not set. Gemini features will be disabled.");
 }

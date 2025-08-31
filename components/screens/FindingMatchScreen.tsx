@@ -1,6 +1,7 @@
+
 import * as React from 'react';
 import { Theme } from '../../types';
-import { themes } from '../../App';
+import { themes } from '../../themes';
 import { Spinner } from '../ui/Spinner';
 
 export const FindingMatchScreen: React.FC<{ playerCount: number; onMatchFound: () => void; themeConfig: typeof themes[Theme] }> = ({ playerCount, onMatchFound, themeConfig }) => {

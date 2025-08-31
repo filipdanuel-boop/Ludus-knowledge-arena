@@ -1,7 +1,8 @@
+
 import * as React from 'react';
 import { Field, Player, GamePhase, FieldType, GameState, Theme } from '../../types';
 import { PLAYER_COLOR_HEX } from '../../constants';
-import { themes } from '../../App';
+import { themes } from '../../themes';
 import { getAttackers } from '../../services/gameLogic';
 
 interface HexagonalGameBoardProps {

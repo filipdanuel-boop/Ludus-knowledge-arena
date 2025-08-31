@@ -1,6 +1,7 @@
+
 import * as React from 'react';
 import { User, Language, Theme } from '../../types';
-import { themes } from '../../App';
+import { themes } from '../../themes';
 import { NeonButton } from '../ui/NeonButton';
 import { OnlinePlayerCounter } from '../ui/OnlinePlayerCounter';
 import { LuduCoin } from '../ui/LuduCoin';

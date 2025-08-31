@@ -1,6 +1,7 @@
+
 import * as React from 'react';
 import { Theme } from '../../types';
-import { themes } from '../../App';
+import { themes } from '../../themes';
 import { Modal } from '../ui/Modal';
 import { NeonButton } from '../ui/NeonButton';
 import { LuduCoin } from '../ui/LuduCoin';

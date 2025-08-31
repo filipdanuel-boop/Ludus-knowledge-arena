@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -8,88 +7,16 @@
     <title>LUDUS: Knowledge Arena</title>
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2089265756761019"
      crossorigin="anonymous"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-      body {
-        overscroll-behavior: none;
-        background-color: #111827; /* bg-gray-900 */
-        color: white;
-        font-family: sans-serif;
-      }
-      .animate-fade-in {
-        animation: fade-in 0.5s ease-out forwards;
-      }
-      .animate-text-focus-in {
-	    -webkit-animation: text-focus-in 1s cubic-bezier(0.550, 0.085, 0.680, 0.530) both;
-	    animation: text-focus-in 1s cubic-bezier(0.550, 0.085, 0.680, 0.530) both;
-      }
-      .animate-shake {
-        animation: shake 0.82s cubic-bezier(.36,.07,.19,.97) both;
-      }
-      .animate-flash-green {
-        animation: flash-green 0.7s ease-out forwards;
-      }
-
-      @keyframes fade-in {
-        from { opacity: 0; transform: scale(0.95); }
-        to { opacity: 1; transform: scale(1); }
-      }
-      
-      @-webkit-keyframes text-focus-in {
-        0% { -webkit-filter: blur(12px); filter: blur(12px); opacity: 0; }
-        100% { -webkit-filter: blur(0px); filter: blur(0px); opacity: 1; }
-      }
-      @keyframes text-focus-in {
-        0% { -webkit-filter: blur(12px); filter: blur(12px); opacity: 0; }
-        100% { -webkit-filter: blur(0px); filter: blur(0px); opacity: 1; }
-      }
-      
-      @keyframes shake {
-        10%, 90% { transform: translate3d(-1px, 0, 0); }
-        20%, 80% { transform: translate3d(2px, 0, 0); }
-        30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
-        40%, 60% { transform: translate3d(4px, 0, 0); }
-      }
-
-      @keyframes pulse-bright {
-        0%, 100% { text-shadow: 0 0 10px #06b6d4, 0 0 20px #06b6d4; }
-        50% { text-shadow: 0 0 20px #0891b2, 0 0 40px #0891b2; }
-      }
-      .animate-pulse-bright { animation: pulse-bright 1.5s ease-in-out infinite; }
-      
-      @keyframes pulse-bright-lime {
-        0%, 100% { text-shadow: 0 0 10px #a3e635, 0 0 20px #a3e635; }
-        50% { text-shadow: 0 0 20px #84cc16, 0 0 40px #84cc16; }
-      }
-      .animate-pulse-bright-lime { animation: pulse-bright-lime 1.5s ease-in-out infinite; }
-
-      @keyframes pulse-bright-sky {
-        0%, 100% { text-shadow: 0 0 10px #38bdf8, 0 0 20px #38bdf8; }
-        50% { text-shadow: 0 0 20px #0ea5e9, 0 0 40px #0ea5e9; }
-      }
-      .animate-pulse-bright-sky { animation: pulse-bright-sky 1.5s ease-in-out infinite; }
-
-      @keyframes pulse-bright-amber {
-        0%, 100% { text-shadow: 0 0 10px #fcd34d, 0 0 20px #fcd34d; }
-        50% { text-shadow: 0 0 20px #f59e0b, 0 0 40px #f59e0b; }
-      }
-      .animate-pulse-bright-amber { animation: pulse-bright-amber 1.5s ease-in-out infinite; }
-      
-      @keyframes flash-green {
-        0%, 100% { box-shadow: 0 0 0px rgba(34, 197, 94, 0); }
-        50% { box-shadow: 0 0 40px 10px rgba(34, 197, 94, 0.7); }
-      }
-    </style>
-<script type="importmap">
+  <script type="importmap">
 {
   "imports": {
-    "react/": "https://aistudiocdn.com/react@^19.1.1/",
     "react": "https://aistudiocdn.com/react@^19.1.1",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
+    "react/": "https://aistudiocdn.com/react@^19.1.1/",
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.16.0",
+    "@vercel/analytics/": "https://aistudiocdn.com/@vercel/analytics@^1.5.0/",
     "vite": "https://aistudiocdn.com/vite@^7.1.3",
-    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.0.2",
-    "@vercel/analytics/": "https://aistudiocdn.com/@vercel/analytics@^1.5.0/"
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.0.2"
   }
 }
 </script>
@@ -97,6 +24,7 @@
 </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
-  </body>
+    <script type="module" src="/src/index.tsx"></script>
+  <script type="module" src="/index.tsx"></script>
+</body>
 </html>
