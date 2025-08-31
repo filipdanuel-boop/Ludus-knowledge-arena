@@ -1,22 +1,23 @@
 import * as React from 'react';
 import { Analytics } from '@vercel/analytics/react';
-import { User, Theme, GamePhase } from './types.ts';
-import { AD_REWARD_COINS, INITIAL_COINS } from './constants.ts';
-import { gameReducer } from './services/gameLogic.ts';
+import { User, Theme, GamePhase } from './types';
+import { AD_REWARD_COINS } from './constants';
+import { gameReducer } from './services/gameLogic';
+import appMetadata from './metadata.json';
 
 // Import screen components
-import { AuthScreen } from './components/screens/AuthScreen.tsx';
-import { LobbyScreen } from './components/screens/LobbyScreen.tsx';
-import { OnlineLobbyScreen } from './components/screens/OnlineLobbyScreen.tsx';
-import { FindingMatchScreen } from './components/screens/FindingMatchScreen.tsx';
-import { GameSetupScreen } from './components/screens/GameSetupScreen.tsx';
-import { RulesScreen } from './components/screens/RulesScreen.tsx';
-import { GameScreen } from './components/screens/GameScreen.tsx';
+import { AuthScreen } from './components/screens/AuthScreen';
+import { LobbyScreen } from './components/screens/LobbyScreen';
+import { OnlineLobbyScreen } from './components/screens/OnlineLobbyScreen';
+import { FindingMatchScreen } from './components/screens/FindingMatchScreen';
+import { GameSetupScreen } from './components/screens/GameSetupScreen';
+import { RulesScreen } from './components/screens/RulesScreen';
+import { GameScreen } from './components/screens/GameScreen';
 
 // Import UI components
-import { AdRewardModal } from './components/game/AdRewardModal.tsx';
-import { ThemeSelectionModal } from './components/game/ThemeSelectionModal.tsx';
-import { Spinner } from './components/ui/Spinner.tsx';
+import { AdRewardModal } from './components/game/AdRewardModal';
+import { ThemeSelectionModal } from './components/game/ThemeSelectionModal';
+import { Spinner } from './components/ui/Spinner';
 
 export const themes: Record<Theme, {
     name: string;
@@ -107,19 +108,11 @@ export default function App() {
   const [isAdModalOpen, setIsAdModalOpen] = React.useState(false);
   const [isThemeModalOpen, setIsThemeModalOpen] = React.useState(false);
   const [onlinePlayerCount, setOnlinePlayerCount] = React.useState(2);
-  const [appMetadata, setAppMetadata] = React.useState<{name: string, description: string} | null>(null);
   const [theme, setTheme] = React.useState<Theme>(() => (localStorage.getItem('ludus_theme') as Theme) || 'default');
   
   const [gameState, dispatch] = React.useReducer(gameReducer, null);
 
   const themeConfig = themes[theme];
-
-  React.useEffect(() => {
-    fetch('/metadata.json')
-        .then(res => res.json())
-        .then(data => setAppMetadata(data))
-        .catch(err => console.error("Failed to load metadata:", err));
-  }, []);
 
   React.useEffect(() => {
     localStorage.setItem('ludus_theme', theme);

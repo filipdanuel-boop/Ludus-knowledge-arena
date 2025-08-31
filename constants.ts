@@ -1,4 +1,4 @@
-import { Category } from './types.ts';
+import { Category } from './types';
 
 export const CATEGORIES = Object.values(Category);
 
