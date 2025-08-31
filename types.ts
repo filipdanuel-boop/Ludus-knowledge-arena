@@ -1,3 +1,5 @@
+export type Theme = 'default' | 'forest' | 'ocean' | 'inferno';
+export type Language = 'cs' | 'en' | 'de' | 'es';
 
 export enum Category {
   Sport = "Sport",
@@ -93,4 +95,5 @@ export interface User {
   email: string;
   luduCoins: number;
   questionHistory: string[]; // Global history of all questions asked
+  language: Language;
 }

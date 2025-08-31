@@ -1,47 +1,126 @@
-
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import * as React from 'react';
 import { Analytics } from '@vercel/analytics/react';
-import { Category, Field, FieldType, GamePhase, GameState, Player, Question, User, QuestionType } from './types';
-import { CATEGORIES, PLAYER_COLORS, INITIAL_COINS, POINTS, PHASE_DURATIONS, HINT_COSTS, PLAYER_COLOR_HEX, BASE_HP, FIELD_HP, AD_REWARD_COINS, BOT_NAMES, ELIMINATION_COIN_BONUS, WIN_COINS_PER_PLAYER, EMAIL_VERIFICATION_BONUS } from './constants';
+import { Category, Field, FieldType, GamePhase, GameState, Player, Question, User, QuestionType, Theme, Language } from './types';
+import { CATEGORIES, PLAYER_COLORS, INITIAL_COINS, POINTS, PHASE_DURATIONS, HINT_COSTS, PLAYER_COLOR_HEX, BASE_HP, FIELD_HP, AD_REWARD_COINS, BOT_NAMES, ELIMINATION_COIN_BONUS, WIN_COINS_PER_PLAYER, EMAIL_VERIFICATION_BONUS, LANGUAGES } from './constants';
 import { generateQuestion, generateOpenEndedQuestion, generateLobbyIntro } from './services/geminiService';
 
 const ANSWER_TIME_LIMIT = 15; // 15 sekund na odpověď
 
+const themes: Record<Theme, {
+    name: string;
+    background: string;
+    accentText: string;
+    accentTextLight: string;
+    accentBorder: string;
+    accentBorderOpaque: string;
+    accentBorderSecondary: string;
+    accentShadow: string;
+    accentRing: string;
+    neonButtonPrimary: string;
+    neonButtonSecondary: string;
+    spinnerBorder: string;
+    pulseAnimation: string;
+    luduCoinGradient: { stopColor1: string, stopColor2: string};
+}> = {
+    default: {
+        name: 'Kyberpunk',
+        background: 'bg-gray-900',
+        accentText: 'text-cyan-400',
+        accentTextLight: 'text-cyan-300',
+        accentBorder: 'border-cyan-500/50',
+        accentBorderOpaque: 'border-cyan-500',
+        accentBorderSecondary: 'border-cyan-600',
+        accentShadow: 'shadow-cyan-500/10',
+        accentRing: 'focus:ring-cyan-500',
+        neonButtonPrimary: "bg-cyan-500 text-gray-900 hover:bg-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.7)] hover:shadow-[0_0_20px_rgba(6,182,212,0.9)] focus:ring-cyan-500",
+        neonButtonSecondary: "bg-gray-700 text-cyan-300 border border-cyan-600 hover:bg-gray-600 hover:text-cyan-200 focus:ring-cyan-600",
+        spinnerBorder: 'border-cyan-400',
+        pulseAnimation: 'animate-pulse-bright',
+        luduCoinGradient: { stopColor1: '#e0f2fe', stopColor2: '#7dd3fc'},
+    },
+    forest: {
+        name: 'Les',
+        background: 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-gray-700 via-green-900 to-black',
+        accentText: 'text-lime-400',
+        accentTextLight: 'text-lime-300',
+        accentBorder: 'border-lime-500/50',
+        accentBorderOpaque: 'border-lime-500',
+        accentBorderSecondary: 'border-lime-600',
+        accentShadow: 'shadow-lime-500/10',
+        accentRing: 'focus:ring-lime-500',
+        neonButtonPrimary: "bg-lime-500 text-gray-900 hover:bg-lime-400 shadow-[0_0_10px_rgba(132,204,22,0.7)] hover:shadow-[0_0_20px_rgba(132,204,22,0.9)] focus:ring-lime-500",
+        neonButtonSecondary: "bg-gray-700 text-lime-300 border border-lime-600 hover:bg-gray-600 hover:text-lime-200 focus:ring-lime-600",
+        spinnerBorder: 'border-lime-400',
+        pulseAnimation: 'animate-pulse-bright-lime',
+        luduCoinGradient: { stopColor1: '#f7fee7', stopColor2: '#d9f99d'},
+    },
+    ocean: {
+        name: 'Oceán',
+        background: 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-gray-700 via-blue-900 to-black',
+        accentText: 'text-sky-400',
+        accentTextLight: 'text-sky-300',
+        accentBorder: 'border-sky-500/50',
+        accentBorderOpaque: 'border-sky-500',
+        accentBorderSecondary: 'border-sky-600',
+        accentShadow: 'shadow-sky-500/10',
+        accentRing: 'focus:ring-sky-500',
+        neonButtonPrimary: "bg-sky-500 text-gray-900 hover:bg-sky-400 shadow-[0_0_10px_rgba(56,189,248,0.7)] hover:shadow-[0_0_20px_rgba(56,189,248,0.9)] focus:ring-sky-500",
+        neonButtonSecondary: "bg-gray-700 text-sky-300 border border-sky-600 hover:bg-gray-600 hover:text-sky-200 focus:ring-sky-600",
+        spinnerBorder: 'border-sky-400',
+        pulseAnimation: 'animate-pulse-bright-sky',
+        luduCoinGradient: { stopColor1: '#e0f2fe', stopColor2: '#bae6fd'},
+    },
+    inferno: {
+        name: 'Peklo',
+        background: 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-gray-700 via-red-900 to-black',
+        accentText: 'text-amber-400',
+        accentTextLight: 'text-amber-300',
+        accentBorder: 'border-amber-500/50',
+        accentBorderOpaque: 'border-amber-500',
+        accentBorderSecondary: 'border-amber-600',
+        accentShadow: 'shadow-amber-500/10',
+        accentRing: 'focus:ring-amber-500',
+        neonButtonPrimary: "bg-amber-500 text-gray-900 hover:bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.7)] hover:shadow-[0_0_20px_rgba(251,191,36,0.9)] focus:ring-amber-500",
+        neonButtonSecondary: "bg-gray-700 text-amber-300 border border-amber-600 hover:bg-gray-600 hover:text-amber-200 focus:ring-amber-600",
+        spinnerBorder: 'border-amber-400',
+        pulseAnimation: 'animate-pulse-bright-amber',
+        luduCoinGradient: { stopColor1: '#fefce8', stopColor2: '#fde047'},
+    }
+};
+
 // --- POMOCNÉ & UI KOMPONENTY ---
 
-const Spinner: React.FC = () => (
-  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400"></div>
+const Spinner: React.FC<{ themeConfig: typeof themes[Theme] }> = ({ themeConfig }) => (
+  <div className={`animate-spin rounded-full h-12 w-12 border-b-2 ${themeConfig.spinnerBorder}`}></div>
 );
 
-const LuduCoin: React.FC<{ className?: string }> = ({ className = "w-6 h-6" }) => (
+const LuduCoin: React.FC<{ className?: string; themeConfig: typeof themes[Theme] }> = ({ className = "w-6 h-6", themeConfig }) => (
     <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="12" cy="12" r="10" fill="url(#grad)" stroke="#a5f3fc" strokeWidth="1.5"/>
+        <circle cx="12" cy="12" r="10" fill="url(#grad)" stroke={themeConfig.luduCoinGradient.stopColor2} strokeWidth="1.5"/>
         <path d="M10.5 8L10.5 16L14.5 16" stroke="#0ea5e9" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
         <defs>
             <radialGradient id="grad" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
-                <stop offset="0%" style={{stopColor: '#e0f2fe', stopOpacity:1}} />
-                <stop offset="100%" style={{stopColor: '#7dd3fc', stopOpacity:1}} />
+                <stop offset="0%" style={{stopColor: themeConfig.luduCoinGradient.stopColor1, stopOpacity:1}} />
+                <stop offset="100%" style={{stopColor: themeConfig.luduCoinGradient.stopColor2, stopOpacity:1}} />
             </radialGradient>
         </defs>
     </svg>
 );
 
-const Modal: React.FC<{ children: React.ReactNode; isOpen: boolean; }> = ({ children, isOpen }) => {
+const Modal: React.FC<{ children: React.ReactNode; isOpen: boolean; themeConfig: typeof themes[Theme] }> = ({ children, isOpen, themeConfig }) => {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 animate-fade-in">
-      <div className="bg-gray-800 border border-cyan-500/50 rounded-lg shadow-xl shadow-cyan-500/10 p-6 w-full max-w-2xl text-white">
+      <div className={`bg-gray-800 border ${themeConfig.accentBorder} rounded-lg shadow-xl ${themeConfig.accentShadow} p-6 w-full max-w-2xl text-white`}>
         {children}
       </div>
     </div>
   );
 };
 
-const NeonButton: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' }> = ({ children, className, variant = 'primary', ...props }) => {
+const NeonButton: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary', themeConfig: typeof themes[Theme] }> = ({ children, className, variant = 'primary', themeConfig, ...props }) => {
   const baseClasses = "px-6 py-2 rounded-md font-bold text-lg transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2";
-  const variantClasses = variant === 'primary'
-    ? "bg-cyan-500 text-gray-900 hover:bg-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.7)] hover:shadow-[0_0_20px_rgba(6,182,212,0.9)] focus:ring-cyan-500"
-    : "bg-gray-700 text-cyan-300 border border-cyan-600 hover:bg-gray-600 hover:text-cyan-200 focus:ring-cyan-600";
+  const variantClasses = variant === 'primary' ? themeConfig.neonButtonPrimary : themeConfig.neonButtonSecondary;
   return (
     <button className={`${baseClasses} ${variantClasses} ${className}`} {...props}>
       {children}
@@ -49,14 +128,14 @@ const NeonButton: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & { var
   );
 };
 
-const OnlinePlayerCounter: React.FC = () => {
-    const [count, setCount] = useState(Math.floor(Math.random() * (350 - 150 + 1)) + 150);
+const OnlinePlayerCounter: React.FC<{ themeConfig: typeof themes[Theme] }> = ({ themeConfig }) => {
+    const [count, setCount] = React.useState(Math.floor(Math.random() * (1200 - 800 + 1)) + 800);
 
-    useEffect(() => {
+    React.useEffect(() => {
         const interval = setInterval(() => {
             setCount(prevCount => {
-                const change = Math.floor(Math.random() * 11) - 5; // -5 to +5
-                return Math.max(100, prevCount + change);
+                const change = Math.floor(Math.random() * 51) - 25; // -25 to +25
+                return Math.max(500, prevCount + change);
             });
         }, 3000); // Update every 3 seconds
 
@@ -64,12 +143,12 @@ const OnlinePlayerCounter: React.FC = () => {
     }, []);
 
     return (
-        <div className="fixed bottom-4 right-4 bg-gray-800/80 backdrop-blur-sm border border-cyan-500/30 px-4 py-2 rounded-lg flex items-center gap-3 shadow-lg">
-            <div className="relative flex items-center justify-center h-3 w-3">
+        <div className={`bg-gray-800/80 backdrop-blur-sm border ${themeConfig.accentBorder} px-3 py-1.5 rounded-lg flex items-center gap-2 shadow-lg`}>
+            <div className="relative flex items-center justify-center h-2.5 w-2.5">
                 <div className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></div>
-                <div className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></div>
+                <div className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></div>
             </div>
-            <p className="text-white font-bold">{count} <span className="text-gray-400 font-normal">Online</span></p>
+            <p className="text-white font-semibold text-sm">{count.toLocaleString()} <span className="text-gray-400 font-normal">Online</span></p>
         </div>
     );
 };
@@ -77,12 +156,12 @@ const OnlinePlayerCounter: React.FC = () => {
 
 // --- OBRAZOVKY ---
 
-const AuthScreen: React.FC<{ onLogin: (user: User) => void }> = ({ onLogin }) => {
-  const [authMode, setAuthMode] = useState<'login' | 'register' | 'verify'>('login');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [verificationCode, setVerificationCode] = useState('');
-  const [errors, setErrors] = useState<{ email?: string; password?: string; code?: string }>({});
+const AuthScreen: React.FC<{ onLogin: (user: User) => void; themeConfig: typeof themes[Theme] }> = ({ onLogin, themeConfig }) => {
+  const [authMode, setAuthMode] = React.useState<'login' | 'register' | 'verify'>('login');
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [verificationCode, setVerificationCode] = React.useState('');
+  const [errors, setErrors] = React.useState<{ email?: string; password?: string; code?: string }>({});
 
   const validate = () => {
     const newErrors: { email?: string; password?: string } = {};
@@ -109,9 +188,9 @@ const AuthScreen: React.FC<{ onLogin: (user: User) => void }> = ({ onLogin }) =>
     if (authMode === 'login') {
         const storedHistory = localStorage.getItem('ludus_question_history');
         const questionHistory = storedHistory ? JSON.parse(storedHistory) : [];
-        onLogin({ email, luduCoins: INITIAL_COINS, questionHistory });
+        const storedLang = (localStorage.getItem('ludus_language') as Language) || 'cs';
+        onLogin({ email, luduCoins: INITIAL_COINS, questionHistory, language: storedLang });
     } else {
-        // Switch to verification view after registration
         setAuthMode('verify');
     }
   };
@@ -124,28 +203,28 @@ const AuthScreen: React.FC<{ onLogin: (user: User) => void }> = ({ onLogin }) =>
     }
     setErrors({});
     
-    // In a real app, you'd verify the code against a backend.
-    // Here, we just log in and give the bonus.
     const storedHistory = localStorage.getItem('ludus_question_history');
     const questionHistory = storedHistory ? JSON.parse(storedHistory) : [];
+    const storedLang = (localStorage.getItem('ludus_language') as Language) || 'cs';
     
     onLogin({ 
         email, 
         luduCoins: INITIAL_COINS + EMAIL_VERIFICATION_BONUS, 
-        questionHistory 
+        questionHistory,
+        language: storedLang,
     });
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white p-4">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4">
       <div className="text-center mb-10">
-        <h1 className="text-7xl font-bold text-cyan-400 tracking-widest animate-pulse-bright">LUDUS</h1>
+        <h1 className={`text-7xl font-bold ${themeConfig.accentText} tracking-widest ${themeConfig.pulseAnimation}`}>LUDUS</h1>
         <p className="text-gray-400 text-xl mt-2">Aréna Vědomostí</p>
       </div>
-      <div className="w-full max-w-md bg-gray-800 p-8 rounded-lg border border-cyan-500/30 shadow-2xl shadow-cyan-500/10">
+      <div className={`w-full max-w-md bg-gray-800 p-8 rounded-lg border ${themeConfig.accentBorder} shadow-2xl ${themeConfig.accentShadow}`}>
         {authMode === 'verify' ? (
              <div>
-                <h2 className="text-3xl font-bold text-center mb-4 text-cyan-300">Ověření Účtu</h2>
+                <h2 className={`text-3xl font-bold text-center mb-4 ${themeConfig.accentTextLight}`}>Ověření Účtu</h2>
                 <p className="text-gray-400 text-center mb-6">Zadejte 6místný kód, který jsme vám zaslali na email. Jako odměnu získáte <span className="font-bold text-yellow-400">{EMAIL_VERIFICATION_BONUS}</span> LuduCoinů!</p>
                 <form onSubmit={handleVerify} noValidate>
                     <div className="mb-4">
@@ -156,16 +235,16 @@ const AuthScreen: React.FC<{ onLogin: (user: User) => void }> = ({ onLogin }) =>
                           maxLength={6}
                           value={verificationCode}
                           onChange={e => setVerificationCode(e.target.value)}
-                          className={`w-full p-3 bg-gray-700 rounded border text-center tracking-[0.5em] text-2xl ${errors.code ? 'border-red-500' : 'border-gray-600'} focus:outline-none focus:ring-2 focus:ring-cyan-500`} 
+                          className={`w-full p-3 bg-gray-700 rounded border text-center tracking-[0.5em] text-2xl ${errors.code ? 'border-red-500' : 'border-gray-600'} focus:outline-none focus:ring-2 ${themeConfig.accentRing}`} 
                         />
                          {errors.code && <p className="text-red-500 text-sm mt-1">{errors.code}</p>}
                     </div>
-                    <NeonButton type="submit" className="w-full">Ověřit a Získat Bonus</NeonButton>
+                    <NeonButton type="submit" className="w-full" themeConfig={themeConfig}>Ověřit a Získat Bonus</NeonButton>
                 </form>
              </div>
         ) : (
             <>
-                <h2 className="text-3xl font-bold text-center mb-6 text-cyan-300">{authMode === 'login' ? 'Přihlášení' : 'Registrace'}</h2>
+                <h2 className={`text-3xl font-bold text-center mb-6 ${themeConfig.accentTextLight}`}>{authMode === 'login' ? 'Přihlášení' : 'Registrace'}</h2>
                 <form onSubmit={handleSubmit} noValidate>
                   <div className="mb-4">
                     <label className="block text-gray-400 mb-2" htmlFor="email">Email</label>
@@ -174,7 +253,7 @@ const AuthScreen: React.FC<{ onLogin: (user: User) => void }> = ({ onLogin }) =>
                       id="email" 
                       value={email}
                       onChange={e => setEmail(e.target.value)}
-                      className={`w-full p-3 bg-gray-700 rounded border ${errors.email ? 'border-red-500' : 'border-gray-600'} focus:outline-none focus:ring-2 focus:ring-cyan-500`} 
+                      className={`w-full p-3 bg-gray-700 rounded border ${errors.email ? 'border-red-500' : 'border-gray-600'} focus:outline-none focus:ring-2 ${themeConfig.accentRing}`} 
                     />
                     {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
                   </div>
@@ -185,17 +264,17 @@ const AuthScreen: React.FC<{ onLogin: (user: User) => void }> = ({ onLogin }) =>
                       id="password" 
                       value={password}
                       onChange={e => setPassword(e.target.value)}
-                      className={`w-full p-3 bg-gray-700 rounded border ${errors.password ? 'border-red-500' : 'border-gray-600'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                      className={`w-full p-3 bg-gray-700 rounded border ${errors.password ? 'border-red-500' : 'border-gray-600'} focus:outline-none focus:ring-2 ${themeConfig.accentRing}`}
                     />
                     {errors.password && <p className="text-red-500 text-sm mt-1">{errors.password}</p>}
                   </div>
-                  <NeonButton type="submit" className="w-full">{authMode === 'login' ? 'Vstoupit do Arény' : 'Vytvořit Účet'}</NeonButton>
+                  <NeonButton type="submit" className="w-full" themeConfig={themeConfig}>{authMode === 'login' ? 'Vstoupit do Arény' : 'Vytvořit Účet'}</NeonButton>
                 </form>
                 <p className="text-center mt-6 text-gray-500">
                   <button onClick={() => {
                     setAuthMode(authMode === 'login' ? 'register' : 'login');
                     setErrors({}); // Clear errors when switching modes
-                  }} className="text-cyan-400 hover:underline">
+                  }} className={`${themeConfig.accentText} hover:underline`}>
                     {authMode === 'login' ? "Potřebujete účet? Zaregistrujte se" : "Už máte účet? Přihlaste se"}
                   </button>
                 </p>
@@ -207,39 +286,62 @@ const AuthScreen: React.FC<{ onLogin: (user: User) => void }> = ({ onLogin }) =>
 };
 
 const LobbyScreen: React.FC<{ 
-    user: User; 
+    user: User;
+    setUser: React.Dispatch<React.SetStateAction<User | null>>;
     onNavigate: (screen: string) => void; 
     onGetFreeCoins: () => void; 
+    onOpenThemeSelector: () => void;
     appMetadata: { name: string, description: string } | null;
-}> = ({ user, onNavigate, onGetFreeCoins, appMetadata }) => {
-    const [introText, setIntroText] = useState<string | null>(null);
+    themeConfig: typeof themes[Theme];
+}> = ({ user, setUser, onNavigate, onGetFreeCoins, onOpenThemeSelector, appMetadata, themeConfig }) => {
+    const [introText, setIntroText] = React.useState<string | null>(null);
 
-    useEffect(() => {
+    React.useEffect(() => {
         const userName = user.email.split('@')[0];
         const defaultIntro = `Vítej v aréně, ${userName}! Dokaž své znalosti a dobyj území.`;
         if (appMetadata) {
             generateLobbyIntro(appMetadata.name, appMetadata.description, userName)
-                .then(text => {
-                    setIntroText(text || defaultIntro);
-                })
-                .catch(() => {
-                    setIntroText(defaultIntro);
-                });
+                .then(text => setIntroText(text || defaultIntro))
+                .catch(() => setIntroText(defaultIntro));
         } else {
             setIntroText(defaultIntro);
         }
     }, [appMetadata, user.email]);
 
+    const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const newLang = e.target.value as Language;
+        setUser(u => u ? { ...u, language: newLang } : null);
+        localStorage.setItem('ludus_language', newLang);
+    };
+
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white p-4">
-            <div className="absolute top-4 right-4 bg-gray-800 border border-cyan-500/30 p-3 rounded-lg text-center flex items-center gap-4">
-                <p className="text-cyan-400 font-bold">{user.email}</p>
-                <div className="flex items-center gap-2">
-                <LuduCoin />
-                <p className="text-yellow-400 text-lg font-bold">{user.luduCoins.toLocaleString()}</p>
-                </div>
+        <div className="min-h-screen flex flex-col items-center justify-center p-4">
+            <div className="absolute top-4 left-4">
+                <button 
+                    onClick={onOpenThemeSelector} 
+                    className={`p-3 rounded-lg ${themeConfig.accentBorder} bg-gray-800/80 backdrop-blur-sm text-white hover:bg-gray-700 transition-colors`}
+                    aria-label="Změnit téma"
+                    title="Změnit téma"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" /></svg>
+                </button>
             </div>
-            <h1 className="text-6xl font-bold text-cyan-400 mb-4 animate-pulse-bright">Hlavní Lobby</h1>
+            <div className={`absolute top-4 right-4 bg-gray-800/80 backdrop-blur-sm border ${themeConfig.accentBorder} p-3 rounded-lg flex items-center gap-4`}>
+                 <div className="flex flex-col text-right">
+                    <p className={`${themeConfig.accentText} font-bold`}>{user.email}</p>
+                    <div className="flex items-center gap-2 justify-end">
+                        <LuduCoin themeConfig={themeConfig} className='w-5 h-5'/>
+                        <p className="text-yellow-400 text-lg font-bold">{user.luduCoins.toLocaleString()}</p>
+                    </div>
+                </div>
+                <select value={user.language} onChange={handleLanguageChange} className={`bg-gray-700 border ${themeConfig.accentBorder} text-white p-2 rounded focus:outline-none focus:ring-2 ${themeConfig.accentRing}`}>
+                    {LANGUAGES.map(lang => (
+                        <option key={lang.code} value={lang.code}>{lang.name}</option>
+                    ))}
+                </select>
+                <OnlinePlayerCounter themeConfig={themeConfig}/>
+            </div>
+            <h1 className={`text-6xl font-bold ${themeConfig.accentText} mb-4 ${themeConfig.pulseAnimation}`}>Hlavní Lobby</h1>
             {introText ? (
                 <p className="text-center text-xl text-gray-300 mb-8 max-w-2xl animate-fade-in">{introText}</p>
             ) : (
@@ -247,54 +349,53 @@ const LobbyScreen: React.FC<{
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-3xl">
                 <div className="flex flex-col items-center">
-                    <NeonButton onClick={() => onNavigate('GAME_SETUP')} className="w-full h-24 text-2xl">
+                    <NeonButton onClick={() => onNavigate('GAME_SETUP')} themeConfig={themeConfig} className="w-full h-24 text-2xl">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                         Hrát Lokálně
                     </NeonButton>
                     <p className="text-gray-400 mt-2 text-center">Hrajte proti botům na jednom zařízení.</p>
                 </div>
                 <div className="flex flex-col items-center">
-                    <NeonButton onClick={() => onNavigate('ONLINE_LOBBY')} className="w-full h-24 text-2xl">
+                    <NeonButton onClick={() => onNavigate('ONLINE_LOBBY')} themeConfig={themeConfig} className="w-full h-24 text-2xl">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2h10a2 2 0 002-2v-1a2 2 0 012-2h1.945M7.707 4.293a1 1 0 010 1.414L5.414 8l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L18.586 8l-2.293-2.293a1 1 0 010-1.414z" /></svg>
                         Hrát Online <span className="text-xs bg-rose-500 text-white px-2 py-1 rounded-full">BETA</span>
                     </NeonButton>
                     <p className="text-gray-400 mt-2 text-center">Vyzvěte ostatní hráče z celého světa.</p>
                 </div>
                 <div className="flex flex-col items-center">
-                    <NeonButton onClick={onGetFreeCoins} variant="secondary" className="w-full h-24 text-2xl">
+                    <NeonButton onClick={onGetFreeCoins} variant="secondary" themeConfig={themeConfig} className="w-full h-24 text-2xl">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         Získat Coiny Zdarma
                     </NeonButton>
                     <p className="text-gray-400 mt-2 text-center">Sledujte reklamu a získejte odměnu.</p>
                 </div>
                 <div className="flex flex-col items-center">
-                    <NeonButton onClick={() => onNavigate('RULES')} variant="secondary" className="w-full h-24 text-2xl">
+                    <NeonButton onClick={() => onNavigate('RULES')} variant="secondary" themeConfig={themeConfig} className="w-full h-24 text-2xl">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
                         Pravidla
                     </NeonButton>
                     <p className="text-gray-400 mt-2 text-center">Naučte se, jak se stát šampionem.</p>
                 </div>
             </div>
-            <OnlinePlayerCounter />
         </div>
     );
 };
 
-const OnlineLobbyScreen: React.FC<{ onStartGame: (playerCount: number) => void; onBack: () => void; }> = ({ onStartGame, onBack }) => (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white p-4">
-        <h1 className="text-5xl font-bold text-cyan-400 mb-8" style={{ textShadow: '0 0 10px #06b6d4' }}>Online Aréna</h1>
-        <div className="bg-gray-800 p-8 rounded-lg border border-cyan-500/30 w-full max-w-md space-y-4">
-            <NeonButton onClick={() => onStartGame(2)} className="w-full h-16">Rychlá Hra (1v1)</NeonButton>
-            <NeonButton onClick={() => onStartGame(4)} className="w-full h-16">Vytvořit Hru (1v1v1v1)</NeonButton>
-            <NeonButton variant="secondary" onClick={onBack} className="w-full mt-4">Zpět</NeonButton>
+const OnlineLobbyScreen: React.FC<{ onStartGame: (playerCount: number) => void; onBack: () => void; themeConfig: typeof themes[Theme] }> = ({ onStartGame, onBack, themeConfig }) => (
+    <div className="min-h-screen flex flex-col items-center justify-center p-4">
+        <h1 className={`text-5xl font-bold ${themeConfig.accentText} mb-8`} style={{ textShadow: `0 0 10px ${PLAYER_COLOR_HEX.cyan}` }}>Online Aréna</h1>
+        <div className={`bg-gray-800 p-8 rounded-lg border ${themeConfig.accentBorder} w-full max-w-md space-y-4`}>
+            <NeonButton onClick={() => onStartGame(2)} className="w-full h-16" themeConfig={themeConfig}>Rychlá Hra (1v1)</NeonButton>
+            <NeonButton onClick={() => onStartGame(4)} className="w-full h-16" themeConfig={themeConfig}>Vytvořit Hru (1v1v1v1)</NeonButton>
+            <NeonButton variant="secondary" onClick={onBack} className="w-full mt-4" themeConfig={themeConfig}>Zpět</NeonButton>
         </div>
     </div>
 );
 
-const FindingMatchScreen: React.FC<{ playerCount: number; onMatchFound: () => void }> = ({ playerCount, onMatchFound }) => {
-    const [elapsed, setElapsed] = useState(0);
+const FindingMatchScreen: React.FC<{ playerCount: number; onMatchFound: () => void; themeConfig: typeof themes[Theme] }> = ({ playerCount, onMatchFound, themeConfig }) => {
+    const [elapsed, setElapsed] = React.useState(0);
 
-    useEffect(() => {
+    React.useEffect(() => {
         const timer = setInterval(() => setElapsed(e => e + 1), 1000);
         const matchTimer = setTimeout(onMatchFound, 5000); // Find match after 5s
         return () => {
@@ -304,9 +405,9 @@ const FindingMatchScreen: React.FC<{ playerCount: number; onMatchFound: () => vo
     }, [onMatchFound]);
 
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white p-4">
-            <h1 className="text-4xl font-bold text-cyan-300 mb-4">Vyhledávám zápas...</h1>
-            <Spinner />
+        <div className="min-h-screen flex flex-col items-center justify-center p-4">
+            <h1 className={`text-4xl font-bold ${themeConfig.accentTextLight} mb-4`}>Vyhledávám zápas...</h1>
+            <Spinner themeConfig={themeConfig} />
             <p className="text-xl mt-4 text-gray-400">Hledám {playerCount - 1} {playerCount - 1 > 1 ? 'soupeřů' : 'soupeře'}</p>
             <p className="text-lg mt-2 text-gray-500">Uplynulý čas: {elapsed}s</p>
         </div>
@@ -314,88 +415,88 @@ const FindingMatchScreen: React.FC<{ playerCount: number; onMatchFound: () => vo
 };
 
 
-const AdRewardModal: React.FC<{ onClaim: () => void; }> = ({ onClaim }) => (
-    <Modal isOpen={true}>
+const AdRewardModal: React.FC<{ onClaim: () => void; themeConfig: typeof themes[Theme] }> = ({ onClaim, themeConfig }) => (
+    <Modal isOpen={true} themeConfig={themeConfig}>
         <div className="text-center">
-            <h2 className="text-3xl font-bold text-cyan-300 mb-4">Sledujete Reklamu</h2>
+            <h2 className={`text-3xl font-bold ${themeConfig.accentTextLight} mb-4`}>Sledujete Reklamu</h2>
             <div className="bg-gray-700 h-48 flex items-center justify-center rounded-lg mb-6">
                 <p className="text-gray-400">Video se přehrává...</p>
             </div>
-            <NeonButton onClick={onClaim}>
-                Získat <span className="font-bold text-yellow-300">{AD_REWARD_COINS}</span> <LuduCoin className="w-8 h-8"/>
+            <NeonButton onClick={onClaim} themeConfig={themeConfig}>
+                Získat <span className="font-bold text-yellow-300">{AD_REWARD_COINS}</span> <LuduCoin className="w-8 h-8" themeConfig={themeConfig}/>
             </NeonButton>
         </div>
     </Modal>
 );
 
-const GameSetupScreen: React.FC<{ onStartGame: (playerCount: number) => void; onBack: () => void; }> = ({ onStartGame, onBack }) => {
-    const [playerCount, setPlayerCount] = useState<number>(2);
+const GameSetupScreen: React.FC<{ onStartGame: (playerCount: number) => void; onBack: () => void; themeConfig: typeof themes[Theme] }> = ({ onStartGame, onBack, themeConfig }) => {
+    const [playerCount, setPlayerCount] = React.useState<number>(2);
 
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white p-4">
-             <h1 className="text-5xl font-bold text-cyan-400 mb-8" style={{ textShadow: '0 0 10px #06b6d4' }}>Vytvořit Lokální Hru</h1>
-             <div className="bg-gray-800 p-8 rounded-lg border border-cyan-500/30 w-full max-w-md">
+        <div className="min-h-screen flex flex-col items-center justify-center p-4">
+             <h1 className={`text-5xl font-bold ${themeConfig.accentText} mb-8`} style={{ textShadow: `0 0 10px ${PLAYER_COLOR_HEX.cyan}` }}>Vytvořit Lokální Hru</h1>
+             <div className={`bg-gray-800 p-8 rounded-lg border ${themeConfig.accentBorder} w-full max-w-md`}>
                  <div className="mb-6">
                      <label className="block text-xl text-gray-300 mb-3">Herní Mód: Všichni proti všem</label>
                      <p className="text-gray-500">Týmové módy již brzy!</p>
                  </div>
                  <div className="mb-8">
                      <label htmlFor="playerCount" className="block text-xl text-gray-300 mb-3">Počet Hráčů</label>
-                     <select id="playerCount" value={playerCount} onChange={e => setPlayerCount(Number(e.target.value))} className="w-full p-3 bg-gray-700 rounded border border-gray-600 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                     <select id="playerCount" value={playerCount} onChange={e => setPlayerCount(Number(e.target.value))} className={`w-full p-3 bg-gray-700 rounded border border-gray-600 text-white focus:outline-none focus:ring-2 ${themeConfig.accentRing}`}>
                          <option value="2">2 Hráči</option>
                          <option value="4">4 Hráči</option>
                      </select>
                  </div>
                  <div className="flex justify-between items-center">
-                    <NeonButton variant="secondary" onClick={onBack}>Zpět do Lobby</NeonButton>
-                    <NeonButton onClick={() => onStartGame(playerCount)}>Začít Hru</NeonButton>
+                    <NeonButton variant="secondary" onClick={onBack} themeConfig={themeConfig}>Zpět do Lobby</NeonButton>
+                    <NeonButton onClick={() => onStartGame(playerCount)} themeConfig={themeConfig}>Začít Hru</NeonButton>
                  </div>
              </div>
         </div>
     );
 };
 
-const RulesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
+const RulesScreen: React.FC<{ onBack: () => void; themeConfig: typeof themes[Theme] }> = ({ onBack, themeConfig }) => {
     return (
-        <div className="min-h-screen bg-gray-900 text-white p-4 sm:p-8">
+        <div className="min-h-screen p-4 sm:p-8">
             <div className="max-w-4xl mx-auto">
-                <h1 className="text-5xl font-bold text-cyan-400 mb-8 text-center" style={{ textShadow: '0 0 10px #06b6d4' }}>Pravidla Hry</h1>
-                <div className="space-y-6 bg-gray-800 p-6 rounded-lg border border-cyan-500/30">
+                <h1 className={`text-5xl font-bold ${themeConfig.accentText} mb-8 text-center`} style={{ textShadow: `0 0 10px ${PLAYER_COLOR_HEX.cyan}` }}>Pravidla Hry</h1>
+                <div className={`space-y-6 bg-gray-800 p-6 rounded-lg border ${themeConfig.accentBorder}`}>
                     <div>
-                        <h2 className="text-2xl font-semibold text-cyan-300 mb-2">Souboje & Rozstřel</h2>
+                        <h2 className={`text-2xl font-semibold ${themeConfig.accentTextLight} mb-2`}>Souboje & Rozstřel</h2>
                         <p className="text-gray-400">Při útoku na soupeřovo území odpovídá útočník i obránce. Pokud oba odpoví správně, nastává "Rozstřel" - nová otázka bez možností, kde se odpověď musí napsat. Kdo odpoví správně, vyhrává.</p>
                     </div>
                      <div>
-                        <h2 className="text-2xl font-semibold text-cyan-300 mb-2">Systém Životů (HP) a Opravy</h2>
+                        <h2 className={`text-2xl font-semibold ${themeConfig.accentTextLight} mb-2`}>Systém Životů (HP) a Opravy</h2>
                         <p className="text-gray-400">Normální území má 1 HP. Hráčské základny mají 3 HP. Pokud je vaše základna poškozená (má méně než 3 HP), můžete během svého útoku kliknout na ni a při správné odpovědi si opravit 1 HP.</p>
                     </div>
                     <div>
-                        <h2 className="text-2xl font-semibold text-cyan-300 mb-2">Fáze 1: Zabírání území (3 kola)</h2>
+                        <h2 className={`text-2xl font-semibold ${themeConfig.accentTextLight} mb-2`}>Fáze 1: Zabírání území (3 kola)</h2>
                         <p className="text-gray-400">Všichni hráči si současně vybírají neutrální pole. Odpovězte správně, abyste pole zabrali a získali 100 bodů. Po této fázi na mapě nezbudou žádná volná pole.</p>
                     </div>
                      <div>
-                        <h2 className="text-2xl font-semibold text-cyan-300 mb-2">Vyřazení ze hry</h2>
+                        <h2 className={`text-2xl font-semibold ${themeConfig.accentTextLight} mb-2`}>Vyřazení ze hry</h2>
                         <p className="text-gray-400">Hráč je vyřazen, pokud jeho základna ztratí poslední život (HP), nebo pokud jeho skóre klesne pod nulu.</p>
                     </div>
                 </div>
                  <div className="text-center mt-8">
-                    <NeonButton onClick={onBack}>Zpět do Lobby</NeonButton>
+                    <NeonButton onClick={onBack} themeConfig={themeConfig}>Zpět do Lobby</NeonButton>
                  </div>
             </div>
         </div>
     );
 };
 
-const GameOverScreen: React.FC<{ gameState: GameState; onBackToLobby: () => void }> = ({ gameState, onBackToLobby }) => {
+const GameOverScreen: React.FC<{ gameState: GameState; onBackToLobby: () => void; themeConfig: typeof themes[Theme] }> = ({ gameState, onBackToLobby, themeConfig }) => {
     const { winners } = gameState;
     const humanPlayer = gameState.players.find(p => !p.isBot);
     const humanIsWinner = humanPlayer && winners?.some(w => w.id === humanPlayer.id);
     const winBonus = humanIsWinner ? (gameState.players.length - 1) * WIN_COINS_PER_PLAYER : 0;
 
     return (
-        <Modal isOpen={true}>
+        <Modal isOpen={true} themeConfig={themeConfig}>
             <div className="text-center">
-                <h1 className="text-5xl font-bold text-cyan-400 mb-4 animate-text-focus-in">Hra Skončila!</h1>
+                <h1 className={`text-5xl font-bold ${themeConfig.accentText} mb-4 animate-text-focus-in`}>Hra Skončila!</h1>
                 {winners && winners.length > 0 ? (
                     <>
                         <h2 className="text-3xl text-yellow-400 mb-2">Vítěz: {winners.map(w => w.name).join(', ')}</h2>
@@ -407,11 +508,11 @@ const GameOverScreen: React.FC<{ gameState: GameState; onBackToLobby: () => void
                 
                 {humanIsWinner && (
                     <div className="my-4 p-3 bg-yellow-500/20 border border-yellow-500 rounded-lg inline-block">
-                        <p className="text-yellow-300 font-bold text-lg">Bonus za vítězství: +{winBonus.toLocaleString()} <LuduCoin className="w-6 h-6 inline-block" /></p>
+                        <p className="text-yellow-300 font-bold text-lg">Bonus za vítězství: +{winBonus.toLocaleString()} <LuduCoin className="w-6 h-6 inline-block" themeConfig={themeConfig} /></p>
                     </div>
                 )}
                 
-                <h3 className="text-xl text-cyan-300 mb-3 border-t border-gray-700 pt-4">Konečné pořadí:</h3>
+                <h3 className={`text-xl ${themeConfig.accentTextLight} mb-3 border-t border-gray-700 pt-4`}>Konečné pořadí:</h3>
                 <div className="space-y-2 max-w-sm mx-auto">
                     {[...gameState.players].sort((a,b) => b.score - a.score).map((p, index) => (
                          <div key={p.id} className={`flex justify-between p-2 rounded ${winners?.some(w => w.id === p.id) ? 'bg-yellow-500/20' : 'bg-gray-700/50'}`}>
@@ -422,7 +523,7 @@ const GameOverScreen: React.FC<{ gameState: GameState; onBackToLobby: () => void
                 </div>
 
                 <div className="mt-8">
-                    <NeonButton onClick={onBackToLobby}>Zpět do Lobby</NeonButton>
+                    <NeonButton onClick={onBackToLobby} themeConfig={themeConfig}>Zpět do Lobby</NeonButton>
                 </div>
             </div>
         </Modal>
@@ -430,7 +531,7 @@ const GameOverScreen: React.FC<{ gameState: GameState; onBackToLobby: () => void
 };
 
 // --- HERNÍ KOMPONENTY ---
-const PlayerStatusUI: React.FC<{ players: Player[], currentPlayerId: string, board: Field[] }> = ({ players, currentPlayerId, board }) => {
+const PlayerStatusUI: React.FC<{ players: Player[], currentPlayerId: string, board: Field[], themeConfig: typeof themes[Theme] }> = ({ players, currentPlayerId, board, themeConfig }) => {
     return (
         <div className="grid grid-cols-2 gap-4 p-4">
             {players.map(p => {
@@ -444,7 +545,7 @@ const PlayerStatusUI: React.FC<{ players: Player[], currentPlayerId: string, boa
                             <>
                              <p className="text-white text-xl">{p.score.toLocaleString()} bodů</p>
                              <div className="flex items-center gap-1 mt-1">
-                                <LuduCoin className="w-5 h-5" />
+                                <LuduCoin className="w-5 h-5" themeConfig={themeConfig} />
                                 <p className="text-yellow-400 text-sm font-semibold">{p.coins.toLocaleString()}</p>
                              </div>
                              {base && <p className={`text-rose-400 font-bold text-md`}>❤️ {base.hp}/{base.maxHp}</p>}
@@ -467,11 +568,11 @@ const getAttackers = (players: Player[]): Player[] => {
     return sortedPlayers.slice(0, attackerCount);
 };
 
-const AttackOrderUI: React.FC<{ attackers: Player[], currentPlayerId: string }> = ({ attackers, currentPlayerId }) => {
+const AttackOrderUI: React.FC<{ attackers: Player[], currentPlayerId: string, themeConfig: typeof themes[Theme] }> = ({ attackers, currentPlayerId, themeConfig }) => {
     if (attackers.length === 0) return null;
     return (
         <div>
-            <h2 className="text-2xl font-bold text-cyan-300 border-b border-gray-700 pb-2 mb-4 mt-6">Pořadí útoků</h2>
+            <h2 className={`text-2xl font-bold ${themeConfig.accentTextLight} border-b border-gray-700 pb-2 mb-4 mt-6`}>Pořadí útoků</h2>
             <div className="space-y-2">
                 {attackers.map((attacker, index) => (
                     <div key={attacker.id} className={`p-2 rounded-md transition-all duration-300 ${attacker.id === currentPlayerId ? 'bg-cyan-500/20' : 'bg-gray-800'}`}>
@@ -493,8 +594,11 @@ const HexagonalGameBoard: React.FC<{
     gamePhase: GamePhase,
     currentPlayerId: string, // Human player ID
     currentTurnPlayerId: string,
-    phase1Selections?: Record<string, number | null>
-}> = ({ board, players, onFieldClick, gamePhase, currentPlayerId, currentTurnPlayerId, phase1Selections = {} }) => {
+    phase1Selections?: Record<string, number | null>,
+    rotation: number,
+    onRotate: (direction: 'left' | 'right') => void,
+    themeConfig: typeof themes[Theme],
+}> = ({ board, players, onFieldClick, gamePhase, currentPlayerId, currentTurnPlayerId, phase1Selections = {}, rotation, onRotate, themeConfig }) => {
     const hexSize = 50;
     const hexWidth = Math.sqrt(3) * hexSize;
     const hexHeight = 2 * hexSize;
@@ -556,7 +660,7 @@ const HexagonalGameBoard: React.FC<{
             isDisabled = selectedFieldIds.includes(field.id) || !!field.ownerId || field.type === FieldType.Black;
             if (!isDisabled && field.type === FieldType.Neutral) {
                 cursor = 'pointer';
-                filter = `drop-shadow(0 0 5px #06b6d4)`;
+                filter = `drop-shadow(0 0 5px ${PLAYER_COLOR_HEX.cyan})`;
             }
         } else if (gamePhase === GamePhase.Phase2_Attacks && isHumanPlayerAttacker && isHumanTurn) {
             const isOwnField = field.ownerId === currentPlayerId;
@@ -583,8 +687,8 @@ const HexagonalGameBoard: React.FC<{
     };
 
     return (
-        <div className="flex-grow flex items-center justify-center p-4 overflow-auto">
-            <svg viewBox={`${minX - hexWidth} ${minY - hexHeight/1.5} ${viewBoxWidth} ${viewBoxHeight}`} className="max-w-full max-h-full">
+        <div className="relative flex-grow flex items-center justify-center p-4 overflow-auto">
+            <svg viewBox={`${minX - hexWidth} ${minY - hexHeight/1.5} ${viewBoxWidth} ${viewBoxHeight}`} className="max-w-full max-h-full" style={{ transform: `rotate(${rotation}deg)`, transition: 'transform 0.5s ease-in-out' }}>
                 <defs>
                     <filter id="glow-red" x="-50%" y="-50%" width="200%" height="200%">
                         <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#ef4444" />
@@ -600,24 +704,44 @@ const HexagonalGameBoard: React.FC<{
                         <g key={field.id} transform={`translate(${x}, ${y})`} onClick={() => !isDisabled && onFieldClick(field.id)} style={{ cursor }}>
                             <polygon points={hexPoints(hexSize * 0.95)} fill={fill} stroke={stroke} strokeWidth={strokeWidth} style={{ transition: 'all 0.2s ease-in-out' }} filter={filter} />
                             {field.type === FieldType.PlayerBase && (
-                                <>
+                                <g transform={`rotate(${-rotation})`}>
                                     <text textAnchor="middle" y={-5} fontSize="30" fill="white" style={{pointerEvents: 'none'}}>★</text>
                                     <text textAnchor="middle" y={25} fontSize="20" fill="white" fontWeight="bold" style={{pointerEvents: 'none'}}>❤️ {field.hp}</text>
-                                </>
+                                </g>
                             )}
                         </g>
                     );
                 })}
             </svg>
+            <div className="absolute bottom-4 right-4 flex gap-2 z-10">
+                <button 
+                    onClick={() => onRotate('left')} 
+                    className={`bg-gray-800/80 backdrop-blur-sm border ${themeConfig.accentBorder} rounded-full h-12 w-12 flex items-center justify-center ${themeConfig.accentText} hover:bg-cyan-500/20 transition-colors focus:outline-none focus:ring-2 ${themeConfig.accentRing}`}
+                    aria-label="Otočit doleva"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M11 15l-3-3m0 0l3-3m-3 3h8.5a6.5 6.5 0 100-13H11" />
+                    </svg>
+                </button>
+                <button 
+                    onClick={() => onRotate('right')} 
+                    className={`bg-gray-800/80 backdrop-blur-sm border ${themeConfig.accentBorder} rounded-full h-12 w-12 flex items-center justify-center ${themeConfig.accentText} hover:bg-cyan-500/20 transition-colors focus:outline-none focus:ring-2 ${themeConfig.accentRing}`}
+                    aria-label="Otočit doprava"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13 9l3 3m0 0l-3 3m3-3H4.5a6.5 6.5 0 100 13H13" />
+                    </svg>
+                </button>
+            </div>
         </div>
     );
 };
 
-const TimerUI: React.FC<{ startTime: number, timeLimit: number, onTimeout: () => void }> = ({ startTime, timeLimit, onTimeout }) => {
-    const [timeLeft, setTimeLeft] = useState(timeLimit);
-    const intervalRef = useRef<NodeJS.Timeout | null>(null);
+const TimerUI: React.FC<{ startTime: number, timeLimit: number, onTimeout: () => void, themeConfig: typeof themes[Theme] }> = ({ startTime, timeLimit, onTimeout, themeConfig }) => {
+    const [timeLeft, setTimeLeft] = React.useState(timeLimit);
+    const intervalRef = React.useRef<number | null>(null);
 
-    useEffect(() => {
+    React.useEffect(() => {
         const updateTimer = () => {
             const elapsed = (Date.now() - startTime) / 1000;
             const remaining = Math.max(0, timeLimit - elapsed);
@@ -628,9 +752,8 @@ const TimerUI: React.FC<{ startTime: number, timeLimit: number, onTimeout: () =>
             }
         };
         
-        // Clear previous interval if it exists
         if (intervalRef.current) clearInterval(intervalRef.current);
-        intervalRef.current = setInterval(updateTimer, 100);
+        intervalRef.current = window.setInterval(updateTimer, 100);
 
         return () => {
             if (intervalRef.current) clearInterval(intervalRef.current);
@@ -645,7 +768,7 @@ const TimerUI: React.FC<{ startTime: number, timeLimit: number, onTimeout: () =>
             <svg className="w-full h-full" viewBox="0 0 44 44">
                 <circle className="text-gray-600" strokeWidth="4" stroke="currentColor" fill="transparent" r="20" cx="22" cy="22" />
                 <circle
-                    className="text-cyan-400"
+                    className={themeConfig.accentText.replace('text-','')}
                     strokeWidth="4"
                     strokeDasharray={circumference}
                     strokeDashoffset={strokeDashoffset}
@@ -676,10 +799,11 @@ const QuestionModal: React.FC<{
     onTimeout: () => void;
     loading: boolean;
     humanPlayer: Player;
-}> = ({ activeQuestion, onAnswer, onUseHint, onTimeout, loading, humanPlayer }) => {
-    const [writtenAnswer, setWrittenAnswer] = useState("");
+    themeConfig: typeof themes[Theme];
+}> = ({ activeQuestion, onAnswer, onUseHint, onTimeout, loading, humanPlayer, themeConfig }) => {
+    const [writtenAnswer, setWrittenAnswer] = React.useState("");
     
-    useEffect(() => {
+    React.useEffect(() => {
         setWrittenAnswer(""); // Reset on new question
     }, [activeQuestion?.question.question]);
 
@@ -697,20 +821,20 @@ const QuestionModal: React.FC<{
     };
 
     return (
-        <Modal isOpen={true}>
+        <Modal isOpen={true} themeConfig={themeConfig}>
             {loading ? (
                 <div className="flex flex-col items-center justify-center min-h-[300px]">
-                    <Spinner />
-                    <p className="mt-4 text-xl text-cyan-300">Generuji otázku...</p>
+                    <Spinner themeConfig={themeConfig} />
+                    <p className={`mt-4 text-xl ${themeConfig.accentTextLight}`}>Zpracovávám otázku...</p>
                 </div>
             ) : activeQuestion && (
                 <div>
                     <div className="flex justify-between items-start mb-4">
                         <div>
-                            <p className="text-sm text-cyan-400 mb-2">{isTieBreaker ? 'ROZSTŘEL!' : (isHealing ? 'Opravujete Základnu' : 'Otázka')}</p>
+                            <p className={`${themeConfig.accentText} text-sm mb-2`}>{isTieBreaker ? 'ROZSTŘEL!' : (isHealing ? 'Opravujete Základnu' : 'Otázka')}</p>
                             <h2 className="text-2xl font-bold">{activeQuestion.question.question}</h2>
                         </div>
-                        {isAnswering && <TimerUI startTime={activeQuestion.startTime} timeLimit={ANSWER_TIME_LIMIT} onTimeout={onTimeout} />}
+                        {isAnswering && <TimerUI startTime={activeQuestion.startTime} timeLimit={ANSWER_TIME_LIMIT} onTimeout={onTimeout} themeConfig={themeConfig} />}
                     </div>
                     {questionType === 'MULTIPLE_CHOICE' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -719,7 +843,7 @@ const QuestionModal: React.FC<{
                                     key={option}
                                     onClick={() => onAnswer(option)}
                                     disabled={!isAnswering}
-                                    className="p-4 bg-gray-700 rounded-md text-left text-lg hover:bg-cyan-600 transition-colors duration-200 border border-transparent hover:border-cyan-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className={`p-4 bg-gray-700 rounded-md text-left text-lg hover:bg-cyan-600 transition-colors duration-200 border border-transparent hover:${themeConfig.accentBorderOpaque} disabled:opacity-50 disabled:cursor-not-allowed`}
                                 >
                                     {option}
                                 </button>
@@ -734,11 +858,11 @@ const QuestionModal: React.FC<{
                                 onChange={(e) => setWrittenAnswer(e.target.value)}
                                 disabled={!isAnswering}
                                 autoFocus
-                                className="w-full p-3 bg-gray-700 rounded border border-gray-600 text-white text-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                className={`w-full p-3 bg-gray-700 rounded border border-gray-600 text-white text-lg focus:outline-none focus:ring-2 ${themeConfig.accentRing}`}
                                 placeholder="Napište odpověď..."
                             />
                              <div className="text-right mt-4">
-                                <NeonButton type="submit" disabled={!isAnswering || !writtenAnswer.trim()}>Odeslat</NeonButton>
+                                <NeonButton type="submit" disabled={!isAnswering || !writtenAnswer.trim()} themeConfig={themeConfig}>Odeslat</NeonButton>
                              </div>
                         </form>
                     )}
@@ -749,8 +873,9 @@ const QuestionModal: React.FC<{
                                 onClick={onUseHint}
                                 disabled={!canAffordHint}
                                 title={!canAffordHint ? "Nedostatek mincí" : ""}
+                                themeConfig={themeConfig}
                             >
-                                Jistota ({HINT_COSTS.AUTO_ANSWER}) <LuduCoin className="w-5 h-5"/>
+                                Jistota ({HINT_COSTS.AUTO_ANSWER}) <LuduCoin className="w-5 h-5" themeConfig={themeConfig}/>
                             </NeonButton>
                         </div>
                     )}
@@ -760,13 +885,13 @@ const QuestionModal: React.FC<{
     );
 };
 
-const SpectatorQuestionModal: React.FC<{ activeQuestion: GameState['activeQuestion'] | null }> = ({ activeQuestion }) => {
+const SpectatorQuestionModal: React.FC<{ activeQuestion: GameState['activeQuestion'] | null; themeConfig: typeof themes[Theme] }> = ({ activeQuestion, themeConfig }) => {
     if (!activeQuestion) return null;
     const { question, questionType } = activeQuestion;
     return (
-        <Modal isOpen={true}>
+        <Modal isOpen={true} themeConfig={themeConfig}>
              <div>
-                <p className="text-sm text-cyan-400 mb-2">Soupeř odpovídá...</p>
+                <p className={`${themeConfig.accentText} text-sm mb-2`}>Soupeř odpovídá...</p>
                 <h2 className="text-2xl font-bold mb-6">{question.question}</h2>
                 {questionType === 'MULTIPLE_CHOICE' && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 opacity-70">
@@ -787,7 +912,7 @@ const SpectatorQuestionModal: React.FC<{ activeQuestion: GameState['activeQuesti
     );
 };
 
-const AnswerFeedbackModal: React.FC<{ result: GameState['answerResult'] | null }> = ({ result }) => {
+const AnswerFeedbackModal: React.FC<{ result: GameState['answerResult'] | null; themeConfig: typeof themes[Theme] }> = ({ result, themeConfig }) => {
     if (!result) return null;
     const { isCorrect, correctAnswer } = result;
     const animationClass = isCorrect ? 'animate-flash-green' : 'animate-shake';
@@ -799,21 +924,21 @@ const AnswerFeedbackModal: React.FC<{ result: GameState['answerResult'] | null }
                     {isCorrect ? "Správně!" : "Špatně!"}
                 </h2>
                 {!isCorrect && (
-                    <p className="text-xl text-gray-300">Správná odpověď byla: <span className="font-bold text-cyan-300">{correctAnswer}</span></p>
+                    <p className="text-xl text-gray-300">Správná odpověď byla: <span className={`font-bold ${themeConfig.accentTextLight}`}>{correctAnswer}</span></p>
                 )}
             </div>
         </div>
     );
 };
 
-const EliminationFeedbackModal: React.FC<{ result: GameState['eliminationResult'] | null }> = ({ result }) => {
+const EliminationFeedbackModal: React.FC<{ result: GameState['eliminationResult'] | null; themeConfig: typeof themes[Theme] }> = ({ result, themeConfig }) => {
     if (!result) return null;
     return (
         <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4 animate-fade-in">
             <div className="p-8 rounded-lg text-center w-full max-w-lg border-4 border-rose-600 bg-rose-900/50">
                 <h2 className="text-5xl font-bold mb-4 text-rose-400 animate-text-focus-in">VYŘAZEN!</h2>
                 <p className="text-2xl text-gray-200">
-                    <span className="font-bold text-cyan-400">{result.attackerName}</span> vyřadil hráče <span className="font-bold text-red-500">{result.eliminatedPlayerName}</span>!
+                    <span className={`font-bold ${themeConfig.accentText}`}>{result.attackerName}</span> vyřadil hráče <span className="font-bold text-red-500">{result.eliminatedPlayerName}</span>!
                 </p>
             </div>
         </div>
@@ -827,13 +952,14 @@ const CategorySelectionModal: React.FC<{
     onSelect: (category: Category) => void;
     onClose: () => void;
     isBaseAttack: boolean;
-}> = ({ isOpen, availableCategories, onSelect, onClose, isBaseAttack }) => {
+    themeConfig: typeof themes[Theme];
+}> = ({ isOpen, availableCategories, onSelect, onClose, isBaseAttack, themeConfig }) => {
     if (!isOpen) return null;
     
     return (
-        <Modal isOpen={true}>
+        <Modal isOpen={true} themeConfig={themeConfig}>
             <div>
-                <h2 className="text-2xl font-bold mb-6 text-cyan-300">Zvolte kategorii útoku</h2>
+                <h2 className={`text-2xl font-bold mb-6 ${themeConfig.accentTextLight}`}>Zvolte kategorii útoku</h2>
                 {isBaseAttack ? (
                      <p className="text-gray-300 text-center text-lg">Útočíte na základnu. Kategorie je dána.</p>
                 ): (
@@ -855,8 +981,8 @@ const CategorySelectionModal: React.FC<{
                 )}
                  <div className="text-center mt-6">
                    {isBaseAttack ? 
-                        <NeonButton onClick={() => onSelect(availableCategories[0])}>Potvrdit Útok</NeonButton> :
-                        <NeonButton variant="secondary" onClick={onClose}>Zrušit útok</NeonButton>
+                        <NeonButton onClick={() => onSelect(availableCategories[0])} themeConfig={themeConfig}>Potvrdit Útok</NeonButton> :
+                        <NeonButton variant="secondary" onClick={onClose} themeConfig={themeConfig}>Zrušit útok</NeonButton>
                    }
                  </div>
             </div>
@@ -868,28 +994,38 @@ const CategorySelectionModal: React.FC<{
 // --- HLAVNÍ KOMPONENTA APLIKACE ---
 
 export default function App() {
-  const [screen, setScreen] = useState<'AUTH' | 'LOBBY' | 'ONLINE_LOBBY' | 'FINDING_MATCH' | 'GAME_SETUP' | 'RULES' | 'GAME'>('AUTH');
-  const [user, setUser] = useState<User | null>(null);
-  const [gameState, setGameState] = useState<GameState | null>(null);
-  const [isLoadingQuestion, setIsLoadingQuestion] = useState(false);
-  const [attackTarget, setAttackTarget] = useState<{ targetFieldId: number; defenderId?: string; isBaseAttack: boolean; } | null>(null);
-  const [gameTime, setGameTime] = useState(0);
-  const [isAdModalOpen, setIsAdModalOpen] = useState(false);
-  const [onlinePlayerCount, setOnlinePlayerCount] = useState(2);
-  const [appMetadata, setAppMetadata] = useState<{name: string, description: string} | null>(null);
-
-
-  const gameLogicTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const botTurnTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [screen, setScreen] = React.useState<'AUTH' | 'LOBBY' | 'ONLINE_LOBBY' | 'FINDING_MATCH' | 'GAME_SETUP' | 'RULES' | 'GAME'>('AUTH');
+  const [user, setUser] = React.useState<User | null>(null);
+  const [gameState, setGameState] = React.useState<GameState | null>(null);
+  const [isProcessingQuestion, setIsProcessingQuestion] = React.useState(false);
+  const [attackTarget, setAttackTarget] = React.useState<{ targetFieldId: number; defenderId?: string; isBaseAttack: boolean; } | null>(null);
+  const [gameTime, setGameTime] = React.useState(0);
+  const [isAdModalOpen, setIsAdModalOpen] = React.useState(false);
+  const [isThemeModalOpen, setIsThemeModalOpen] = React.useState(false);
+  const [onlinePlayerCount, setOnlinePlayerCount] = React.useState(2);
+  const [appMetadata, setAppMetadata] = React.useState<{name: string, description: string} | null>(null);
+  const [boardRotation, setBoardRotation] = React.useState(0);
+  const [theme, setTheme] = React.useState<Theme>(() => (localStorage.getItem('ludus_theme') as Theme) || 'default');
   
-  useEffect(() => {
+  const themeConfig = themes[theme];
+
+  const gameLogicTimeoutRef = React.useRef<number | null>(null);
+  const botTurnTimeoutRef = React.useRef<number | null>(null);
+  
+  React.useEffect(() => {
     fetch('/metadata.json')
         .then(res => res.json())
         .then(data => setAppMetadata(data))
         .catch(err => console.error("Failed to load metadata:", err));
   }, []);
+
+  React.useEffect(() => {
+    localStorage.setItem('ludus_theme', theme);
+    document.body.className = '';
+    document.body.classList.add(themeConfig.background);
+  }, [theme, themeConfig]);
   
-  useEffect(() => {
+  React.useEffect(() => {
     const timer = setInterval(() => {
       if (gameState && gameState.gamePhase !== GamePhase.GameOver) {
         setGameTime(Date.now() - gameState.gameStartTime);
@@ -907,6 +1043,11 @@ export default function App() {
     setScreen(targetScreen as any);
   };
   
+  const handleRotateBoard = (direction: 'left' | 'right') => {
+    const angle = direction === 'left' ? 60 : -60;
+    setBoardRotation(prev => (prev + angle + 360) % 360);
+  };
+
   const createInitialGameState = (playerCount: number, isOnlineMode: boolean = false): GameState => {
       const players: Player[] = Array.from({ length: playerCount }, (_, i) => {
           const isBot = i !== 0;
@@ -957,7 +1098,6 @@ export default function App() {
           return !assignedBaseCoords.has(coordKey);
       });
       
-      // Shuffle neutral fields for random category assignment
       for (let i = neutralFields.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [neutralFields[i], neutralFields[j]] = [neutralFields[j], neutralFields[i]];
@@ -1000,9 +1140,7 @@ export default function App() {
     const advanceGameState = (state: GameState) => {
         setGameState(prev => {
             if (!prev) return null;
-            let newState = { ...prev, ...state };
-            
-            return newState;
+            return { ...prev, ...state };
         });
     }
 
@@ -1058,19 +1196,18 @@ export default function App() {
   }
 
   const handleFieldClick = async (fieldId: number) => {
-    if (!gameState || isLoadingQuestion || gameState.activeQuestion) return;
+    if (!gameState || isProcessingQuestion || gameState.activeQuestion || !user) return;
     
     const humanPlayer = gameState.players.find(p => !p.isBot)!;
     const field = gameState.board.find(f => f.id === fieldId)!;
     
     if (gameState.gamePhase === GamePhase.Phase1_LandGrab) {
-        if (gameState.phase1Selections?.[humanPlayer.id] != null) return;
+        if (gameState.phase1Selections?.[humanPlayer.id] != null || Object.values(gameState.phase1Selections || {}).includes(fieldId)) return;
         if (field.type === FieldType.Neutral && !field.ownerId) {
-             if (Object.values(gameState.phase1Selections || {}).includes(fieldId)) return;
             setGameState(prev => prev ? { ...prev, phase1Selections: {...prev.phase1Selections, [humanPlayer.id]: fieldId} } : null);
-            setIsLoadingQuestion(true);
-            const question = await generateQuestion(field.category!, user?.questionHistory);
-            setIsLoadingQuestion(false);
+            setIsProcessingQuestion(true);
+            const question = await generateQuestion(field.category!, gameState.questionHistory, user.language);
+            setIsProcessingQuestion(false);
             if (question) {
                 setGameState(prev => {
                     if(!prev) return null;
@@ -1086,16 +1223,12 @@ export default function App() {
         }
     } else if (gameState.gamePhase === GamePhase.Phase2_Attacks) {
         const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
-        if (currentPlayer.isBot || currentPlayer.id !== humanPlayer.id) return;
+        if (currentPlayer.isBot || currentPlayer.id !== humanPlayer.id || !getAttackers(gameState.players).some(p => p.id === currentPlayer.id)) return;
 
-        const currentAttackers = getAttackers(gameState.players);
-        if (!currentAttackers.some(p => p.id === currentPlayer.id)) return;
-
-        // Healing logic
         if (field.ownerId === currentPlayer.id && field.type === FieldType.PlayerBase && field.hp < field.maxHp) {
-             setIsLoadingQuestion(true);
-             const question = await generateQuestion(field.category!, user?.questionHistory);
-             setIsLoadingQuestion(false);
+             setIsProcessingQuestion(true);
+             const question = await generateQuestion(field.category!, gameState.questionHistory, user.language);
+             setIsProcessingQuestion(false);
              if (question) {
                 setGameState(prev => {
                     if(!prev) return null;
@@ -1112,10 +1245,10 @@ export default function App() {
         }
 
         if (field.type === FieldType.Black) {
-            setIsLoadingQuestion(true);
+            setIsProcessingQuestion(true);
             const randomCategory = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
-            const question = await generateQuestion(randomCategory, user?.questionHistory);
-            setIsLoadingQuestion(false);
+            const question = await generateQuestion(randomCategory, gameState.questionHistory, user.language);
+            setIsProcessingQuestion(false);
             if (question) {
                 setGameState(prev => {
                     if(!prev) return null;
@@ -1135,26 +1268,21 @@ export default function App() {
   };
 
   const handleCategorySelect = async (category: Category) => {
-    if (!gameState || !attackTarget) return;
+    if (!gameState || !attackTarget || !user) return;
     const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
     
-    setAttackTarget(null); // Close modal immediately
-    setIsLoadingQuestion(true);
-    const question = await generateQuestion(category, user?.questionHistory);
-    setIsLoadingQuestion(false);
+    setAttackTarget(null);
+    setIsProcessingQuestion(true);
+    const question = await generateQuestion(category, gameState.questionHistory, user.language);
+    setIsProcessingQuestion(false);
 
     if (question) {
          setGameState(prev => {
             if (!prev) return null;
             const { targetFieldId, defenderId, isBaseAttack } = attackTarget;
-            
-            // Only use an attack category if it's NOT a base attack
             const players = isBaseAttack ? prev.players : prev.players.map(p => p.id === currentPlayer.id ? {...p, usedAttackCategories: [...p.usedAttackCategories, category]} : p);
-
             const playerAnswers: Record<string, null> = { [currentPlayer.id]: null };
-            if (defenderId) {
-                 playerAnswers[defenderId] = null; // Prepare for defender's answer
-            }
+            if (defenderId) playerAnswers[defenderId] = null;
             
             const newHistory = [...(user?.questionHistory || []), question.question];
             setUser(u => u ? {...u, questionHistory: newHistory} : null);
@@ -1170,9 +1298,9 @@ export default function App() {
     }
   };
   
-    const finalizeTurnResolution = useCallback(async (initialState: GameState) => {
+    const finalizeTurnResolution = React.useCallback(async (initialState: GameState) => {
         let finalState = JSON.parse(JSON.stringify(initialState));
-        if (!finalState.activeQuestion) return;
+        if (!finalState.activeQuestion || !user) return;
         
         const { attackerId, defenderId, targetFieldId, playerAnswers, question, questionType, actionType, isBaseAttack } = finalState.activeQuestion;
         
@@ -1181,23 +1309,22 @@ export default function App() {
         let elimination: { eliminatedPlayerName: string, attackerName: string } | null = null;
         
         const attackerAnswer = playerAnswers[attackerId];
-        const isAttackerCorrect = questionType === 'MULTIPLE_CHOICE' ? attackerAnswer === question.correctAnswer : normalizeAnswer(attackerAnswer || "") === normalizeAnswer(question.correctAnswer);
+        const isAttackerCorrect = normalizeAnswer(attackerAnswer || "") === normalizeAnswer(question.correctAnswer);
         
-        // Tie-breaker logic
         if (defenderId) {
             const defenderAnswer = playerAnswers[defenderId];
-            const isDefenderCorrect = questionType === 'MULTIPLE_CHOICE' ? defenderAnswer === question.correctAnswer : normalizeAnswer(defenderAnswer || "") === normalizeAnswer(question.correctAnswer);
+            const isDefenderCorrect = normalizeAnswer(defenderAnswer || "") === normalizeAnswer(question.correctAnswer);
             
             if (isAttackerCorrect && isDefenderCorrect && !isBaseAttack && !finalState.activeQuestion.isTieBreaker) {
                 const defender = finalState.players.find((p: Player) => p.id === defenderId);
-                if (defender) {
-                    finalState.gameLog.push(`ROZSTŘEL mezi ${attacker.name} a ${defender.name}!`);
-                }
+                if (defender) finalState.gameLog.push(`ROZSTŘEL mezi ${attacker.name} a ${defender.name}!`);
                 advanceGameState(finalState);
                 
-                setIsLoadingQuestion(true);
-                const tieBreakerQuestion = await generateOpenEndedQuestion(field.category, question.question, user?.questionHistory);
-                setIsLoadingQuestion(false);
+                setIsProcessingQuestion(true);
+                // Tie-breaker is always in user's language or Czech for bot
+                const langForTiebreaker = finalState.players.find((p: Player) => p.id === defender.id)?.isBot ? 'cs' : user.language;
+                const tieBreakerQuestion = await generateOpenEndedQuestion(field.category, finalState.questionHistory, langForTiebreaker);
+                setIsProcessingQuestion(false);
                 
                 if (tieBreakerQuestion) {
                     setGameState(prev => {
@@ -1220,29 +1347,27 @@ export default function App() {
                     });
                 } else {
                     finalState.gameLog.push("Chyba při generování rozstřelu, kolo končí remízou.");
-                    // Fallback to end turn as draw
                 }
-                return; // Stop further processing until tie-breaker is resolved
+                return;
             }
         }
         
-        // --- Standard Turn Resolution ---
         if (actionType === 'HEAL') {
             if (isAttackerCorrect) {
                 field.hp = Math.min(field.maxHp, field.hp + 1);
                 attacker.score += POINTS.HEAL_SUCCESS;
-                finalState.gameLog.push(`${attacker.name} si úspěšně opravil základnu a získal ${POINTS.HEAL_SUCCESS} bodů.`);
+                finalState.gameLog.push(`${attacker.name} si úspěšně opravil základnu.`);
             } else {
                 attacker.score += POINTS.HEAL_FAIL_PENALTY;
-                finalState.gameLog.push(`${attacker.name} neuspěl při opravě základny a ztratil ${-POINTS.HEAL_FAIL_PENALTY} bodů.`);
+                finalState.gameLog.push(`${attacker.name} neuspěl při opravě.`);
             }
         } else if (actionType === 'ATTACK') {
-             if (defenderId) { // Duel or Base Attack
+             if (defenderId) {
                 const defender = finalState.players.find((p: Player) => p.id === defenderId);
                 const defenderAnswer = playerAnswers[defenderId];
-                const isDefenderCorrect = questionType === 'MULTIPLE_CHOICE' ? defenderAnswer === question.correctAnswer : normalizeAnswer(defenderAnswer || "") === normalizeAnswer(question.correctAnswer);
+                const isDefenderCorrect = normalizeAnswer(defenderAnswer || "") === normalizeAnswer(question.correctAnswer);
                 
-                if (isAttackerCorrect && (!isDefenderCorrect || isBaseAttack)) { // Attacker wins (in base attack, defender doesn't answer)
+                if (isAttackerCorrect && (!isDefenderCorrect || isBaseAttack)) {
                     field.hp -= 1;
                     if (isBaseAttack) {
                         attacker.score += POINTS.ATTACK_DAMAGE;
@@ -1254,15 +1379,13 @@ export default function App() {
                         defender.score += POINTS.ATTACK_LOSS_DEFENDER;
                         finalState.gameLog.push(`${attacker.name} dobyl území od hráče ${defender.name}!`);
                     }
-                } else if (!isAttackerCorrect && isDefenderCorrect) { // Defender wins
+                } else if (!isAttackerCorrect && isDefenderCorrect) {
                     attacker.score += POINTS.ATTACK_LOSS_ATTACKER;
                     if (!isBaseAttack) defender.score += POINTS.ATTACK_WIN_DEFENDER;
-                    finalState.gameLog.push(`${defender.name} ubránil své území proti ${attacker.name}.`);
-                } else if (!isAttackerCorrect && (!isDefenderCorrect || isBaseAttack)) { // Attacker wrong (defender doesn't matter)
+                    finalState.gameLog.push(`${defender.name} ubránil své území.`);
+                } else {
                     attacker.score += POINTS.ATTACK_LOSS_ATTACKER;
-                    finalState.gameLog.push(`${attacker.name} odpověděl špatně a útok se nezdařil.`);
-                } else { // Both correct in duel (tie-breaker already handled) or some other case
-                    finalState.gameLog.push(`Souboj mezi ${attacker.name} a ${defender.name} skončil remízou!`);
+                    finalState.gameLog.push(`Útok hráče ${attacker.name} se nezdařil.`);
                 }
                 
                 if (field.hp <= 0) {
@@ -1274,10 +1397,8 @@ export default function App() {
                         defender.score = 0;
                         defender.isEliminated = true;
                         elimination = { eliminatedPlayerName: defender.name, attackerName: attacker.name };
-                        finalState.gameLog.push(`${attacker.name} ZNIČIL základnu hráče ${defender.name} a vyřadil ho!`);
-                        finalState.board.forEach((f: Field) => {
-                            if (f.ownerId === defender.id) { f.ownerId = attacker.id; }
-                        });
+                        finalState.gameLog.push(`${attacker.name} ZNIČIL základnu hráče ${defender.name}!`);
+                        finalState.board.forEach((f: Field) => { if (f.ownerId === defender.id) f.ownerId = attacker.id; });
                     }
                 }
 
@@ -1290,7 +1411,7 @@ export default function App() {
                     finalState.gameLog.push(`${attacker.name} zabral černé území!`);
                 } else {
                     attacker.score += POINTS.BLACK_FIELD_FAIL;
-                    finalState.gameLog.push(`${attacker.name} neuspěl při zabírání černého území.`);
+                    finalState.gameLog.push(`${attacker.name} neuspěl na černém území.`);
                 }
             }
         }
@@ -1312,7 +1433,6 @@ export default function App() {
             finalState.gamePhase = GamePhase.GameOver;
             finalState.winners = activePlayers;
         } else {
-             // Turn progression logic
             const currentAttackers = getAttackers(finalState.players);
             const currentAttackerInListIndex = currentAttackers.findIndex(p => p.id === attackerId);
             
@@ -1338,17 +1458,17 @@ export default function App() {
         }
         
         finalState.activeQuestion = null;
-        finalState.answerResult = null; // Clear feedback
+        finalState.answerResult = null;
         if (elimination) finalState.eliminationResult = elimination;
         advanceGameState(finalState);
 
         if (elimination) {
-            gameLogicTimeoutRef.current = setTimeout(() => {
+            gameLogicTimeoutRef.current = window.setTimeout(() => {
                 setGameState(s => s ? { ...s, eliminationResult: null } : null);
             }, 3000);
         }
 
-    }, [user?.questionHistory]);
+    }, [user]);
 
   const handleAnswer = (answer: string) => {
     if (!gameState || !gameState.activeQuestion) return;
@@ -1357,18 +1477,12 @@ export default function App() {
     const { activeQuestion } = gameState;
     const humanPlayer = gameState.players.find(p => !p.isBot)!;
     
-    const isCorrect = activeQuestion.questionType === 'MULTIPLE_CHOICE' 
-        ? answer === activeQuestion.question.correctAnswer
-        : normalizeAnswer(answer) === normalizeAnswer(activeQuestion.question.correctAnswer);
+    const isCorrect = normalizeAnswer(answer) === normalizeAnswer(activeQuestion.question.correctAnswer);
 
     setGameState(prev => {
         if (!prev || !prev.activeQuestion) return prev;
         
-        // Update the answer in the current state
-        const updatedActiveQuestion = { ...prev.activeQuestion };
-        updatedActiveQuestion.playerAnswers[humanPlayer.id] = answer;
-        
-        // Show feedback immediately
+        const updatedActiveQuestion = { ...prev.activeQuestion, playerAnswers: { ...prev.activeQuestion.playerAnswers, [humanPlayer.id]: answer } };
         const newStateWithFeedback = {
             ...prev,
             answerResult: { playerId: humanPlayer.id, isCorrect, correctAnswer: activeQuestion.question.correctAnswer },
@@ -1378,8 +1492,7 @@ export default function App() {
         const allPlayersAnswered = Object.values(updatedActiveQuestion.playerAnswers).every(ans => ans !== null);
 
         if (allPlayersAnswered) {
-             // If all have answered, set a timeout to finalize the turn after showing feedback
-            gameLogicTimeoutRef.current = setTimeout(() => {
+            gameLogicTimeoutRef.current = window.setTimeout(() => {
                 finalizeTurnResolution(newStateWithFeedback);
             }, 2000);
         }
@@ -1406,39 +1519,40 @@ export default function App() {
         setScreen('LOBBY');
     };
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (gameState?.gamePhase === GamePhase.Phase1_LandGrab) {
-        const selectionsMadeCount = Object.keys(gameState.phase1Selections || {}).length;
-        const botCount = gameState.players.filter(p => p.isBot).length;
-
-        if (selectionsMadeCount < botCount && selectionsMadeCount === 0) {
+        const humanSelection = gameState.phase1Selections?.[gameState.players.find(p => !p.isBot)!.id];
+        const bots = gameState.players.filter(p => p.isBot);
+        
+        if (humanSelection && Object.keys(gameState.phase1Selections || {}).length < bots.length + 1) {
             const botSelections: Record<string, number> = {};
-            const availableFields = gameState.board.filter(f => f.type === FieldType.Neutral && !f.ownerId);
+            const availableFields = gameState.board.filter(f => f.type === FieldType.Neutral && !f.ownerId && f.id !== humanSelection);
             
-            gameState.players.forEach(player => {
-                if (player.isBot && availableFields.length > 0) {
+            bots.forEach(player => {
+                if (availableFields.length > 0) {
                     const randomIndex = Math.floor(Math.random() * availableFields.length);
                     botSelections[player.id] = availableFields.splice(randomIndex, 1)[0].id;
                 }
             });
 
             if (Object.keys(botSelections).length > 0) {
-                setGameState(prev => prev ? { ...prev, phase1Selections: botSelections } : null);
+                setGameState(prev => prev ? { ...prev, phase1Selections: {...prev.phase1Selections, ...botSelections } } : null);
             }
         }
     }
-  }, [gameState?.gamePhase, gameState?.round]);
+  }, [gameState?.gamePhase, gameState?.phase1Selections, gameState?.players]);
 
-    const passBotTurn = useCallback((currentState: GameState, reason: string) => {
+    const passBotTurn = React.useCallback((currentState: GameState, reason: string) => {
         let newState = JSON.parse(JSON.stringify(currentState));
         const bot = newState.players[newState.currentTurnPlayerIndex];
-        newState.gameLog.push(`${bot.name} (Bot) přeskakuje tah. Důvod: ${reason}`);
+        newState.gameLog.push(`${bot.name} (Bot) přeskakuje tah: ${reason}`);
         
-        // Advance turn without action
         const currentAttackers = getAttackers(newState.players);
         const currentAttackerInListIndex = currentAttackers.findIndex(p => p.id === bot.id);
         if (currentAttackerInListIndex === -1 || currentAttackerInListIndex === currentAttackers.length - 1 || currentAttackers.length === 0) {
             newState.round += 1;
+            const nextRoundAttackers = getAttackers(newState.players);
+            if(nextRoundAttackers.length > 0) newState.currentTurnPlayerIndex = newState.players.findIndex((p: Player) => p.id === nextRoundAttackers[0].id);
         } else {
              const nextAttacker = currentAttackers[currentAttackerInListIndex + 1];
             newState.currentTurnPlayerIndex = newState.players.findIndex((p: Player) => p.id === nextAttacker.id);
@@ -1446,175 +1560,132 @@ export default function App() {
         advanceGameState(newState);
     }, []);
 
-    const handleBotAttackTurn = useCallback(async (currentState: GameState) => {
+    const handleBotAttackTurn = React.useCallback(async (currentState: GameState) => {
         const currentPlayer = currentState.players[currentState.currentTurnPlayerIndex];
         const botBase = currentState.board.find(f => f.ownerId === currentPlayer.id && f.type === FieldType.PlayerBase);
 
-        // Heal logic for bot
         if (botBase && botBase.hp < botBase.maxHp && (botBase.hp === 1 || Math.random() < 0.5)) {
-            setIsLoadingQuestion(true);
-            const question = await generateQuestion(botBase.category!, user?.questionHistory);
-            setIsLoadingQuestion(false);
+            const question = await generateQuestion(botBase.category!, currentState.questionHistory, 'cs');
             if(question) {
-                const isCorrect = Math.random() < 0.8;
-                const answer = isCorrect ? question.correctAnswer : "wrong";
                 let tempState = JSON.parse(JSON.stringify(currentState));
-                 tempState.questionHistory.push(question.question);
-                 const newHistory = [...(user?.questionHistory || []), question.question];
-                 setUser(u => u ? {...u, questionHistory: newHistory} : null);
-                 localStorage.setItem('ludus_question_history', JSON.stringify(newHistory));
-
+                tempState.questionHistory.push(question.question);
                 tempState.activeQuestion = {
-                    question, questionType: 'MULTIPLE_CHOICE', targetFieldId: botBase.id, attackerId: currentPlayer.id, actionType: 'HEAL', isBaseAttack: false, isTieBreaker: false, playerAnswers: { [currentPlayer.id]: answer }, startTime: Date.now()
+                    question, questionType: 'MULTIPLE_CHOICE', targetFieldId: botBase.id, attackerId: currentPlayer.id, actionType: 'HEAL', isBaseAttack: false, isTieBreaker: false, playerAnswers: { [currentPlayer.id]: Math.random() < 0.8 ? question.correctAnswer : "wrong" }, startTime: Date.now()
                 };
                 finalizeTurnResolution(tempState);
                 return;
             }
         }
         
-        // Attack logic for bot
         const validTargets = currentState.board.filter(f => f.ownerId !== currentPlayer.id && f.type !== FieldType.Neutral);
         if (validTargets.length === 0) {
             passBotTurn(currentState, "Nebyly nalezeny žádné platné cíle.");
             return;
         }
 
-        const humanPlayer = currentState.players.find(p => !p.isBot);
-        let prioritizedTargets = validTargets.filter(t => t.ownerId === humanPlayer?.id);
-        if (prioritizedTargets.length === 0) prioritizedTargets = validTargets;
-
-        const targetField = prioritizedTargets[Math.floor(Math.random() * prioritizedTargets.length)];
+        const targetField = validTargets[Math.floor(Math.random() * validTargets.length)];
         const isBaseAttack = targetField.type === FieldType.PlayerBase;
         const defender = currentState.players.find(p => p.id === targetField.ownerId);
-
         let category: Category;
-        if (isBaseAttack) {
-            category = targetField.category!;
-        } else if (targetField.type === FieldType.Black) {
-            category = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
-        } else {
+
+        if (isBaseAttack) category = targetField.category!;
+        else if (targetField.type === FieldType.Black) category = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
+        else {
             const availableCategories = CATEGORIES.filter(c => !currentPlayer.usedAttackCategories.includes(c));
-            if (availableCategories.length === 0) {
-                passBotTurn(currentState, "Byly vyčerpány všechny kategorie pro útok.");
-                return;
-            }
+            if (availableCategories.length === 0) { passBotTurn(currentState, "Vyčerpány kategorie."); return; }
             category = availableCategories[Math.floor(Math.random() * availableCategories.length)];
         }
 
-        setIsLoadingQuestion(true);
-        const question = await generateQuestion(category, user?.questionHistory);
-        setIsLoadingQuestion(false);
-
-        if (!question) {
-            passBotTurn(currentState, "Chyba při generování otázky.");
-            return;
-        }
+        const question = await generateQuestion(category, currentState.questionHistory, 'cs');
+        if (!question) { passBotTurn(currentState, "Chyba při generování otázky."); return; }
 
         let newState = JSON.parse(JSON.stringify(currentState));
-        const botPlayer = newState.players.find((p: Player) => p.id === currentPlayer.id)!;
-        
-        if (!isBaseAttack && targetField.type !== FieldType.Black) {
-            botPlayer.usedAttackCategories.push(category);
-        }
-        
-        const newHistory = [...(user?.questionHistory || []), question.question];
-        setUser(u => u ? {...u, questionHistory: newHistory} : null);
-        localStorage.setItem('ludus_question_history', JSON.stringify(newHistory));
+        if (!isBaseAttack && targetField.type !== FieldType.Black) newState.players.find((p: Player) => p.id === currentPlayer.id)!.usedAttackCategories.push(category);
         newState.questionHistory.push(question.question);
         
-        const isAttackerCorrect = Math.random() < 0.7;
-        const attackerAnswer = isAttackerCorrect ? question.correctAnswer : "wrong_bot_answer";
-        
-        const playerAnswers: Record<string, string | null> = { [currentPlayer.id]: attackerAnswer };
-        
         newState.activeQuestion = {
-            question, questionType: 'MULTIPLE_CHOICE', targetFieldId: targetField.id, attackerId: currentPlayer.id, defenderId: targetField.ownerId || undefined, isBaseAttack, isTieBreaker: false, playerAnswers, startTime: Date.now(), actionType: 'ATTACK'
+            question, questionType: 'MULTIPLE_CHOICE', targetFieldId: targetField.id, attackerId: currentPlayer.id, defenderId: targetField.ownerId || undefined, isBaseAttack, isTieBreaker: false, playerAnswers: { [currentPlayer.id]: Math.random() < 0.7 ? question.correctAnswer : "wrong" }, startTime: Date.now(), actionType: 'ATTACK'
         };
         
         if (defender && !defender.isBot) {
-            advanceGameState(newState); // Wait for human to answer
+            advanceGameState(newState);
         } else {
             if (defender && defender.isBot) {
-                const isDefenderCorrect = Math.random() < 0.6;
-                newState.activeQuestion.playerAnswers[defender.id] = isDefenderCorrect ? question.correctAnswer : "wrong_bot_answer_2";
+                newState.activeQuestion.playerAnswers[defender.id] = Math.random() < 0.6 ? question.correctAnswer : "wrong_2";
             }
             finalizeTurnResolution(newState);
         }
-    }, [passBotTurn, finalizeTurnResolution, user?.questionHistory]);
+    }, [passBotTurn, finalizeTurnResolution]);
 
-    useEffect(() => {
+    React.useEffect(() => {
         if (botTurnTimeoutRef.current) clearTimeout(botTurnTimeoutRef.current);
-        
-        if (gameState?.gamePhase === GamePhase.Phase2_Attacks && !gameState.activeQuestion && !isLoadingQuestion && !gameState.answerResult && !gameState.eliminationResult) {
+        if (gameState?.gamePhase === GamePhase.Phase2_Attacks && !gameState.activeQuestion && !isProcessingQuestion && !gameState.answerResult && !gameState.eliminationResult) {
             const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
-            
-            if (currentPlayer?.isBot) {
-                botTurnTimeoutRef.current = setTimeout(() => {
-                    if(!gameState) return;
-                    const attackers = getAttackers(gameState.players);
-                    if (attackers.some(p => p.id === currentPlayer.id)) {
-                        handleBotAttackTurn(gameState);
-                    }
-                }, 2000);
+            if (currentPlayer?.isBot && getAttackers(gameState.players).some(p => p.id === currentPlayer.id)) {
+                botTurnTimeoutRef.current = window.setTimeout(() => handleBotAttackTurn(gameState), 2000);
             }
         }
-        
         return () => { if (botTurnTimeoutRef.current) clearTimeout(botTurnTimeoutRef.current); };
-    }, [gameState, isLoadingQuestion, handleBotAttackTurn, passBotTurn]);
+    }, [gameState, isProcessingQuestion, handleBotAttackTurn]);
     
-    // Efekt pro aktualizaci stavu mincí po skončení hry
-    useEffect(() => {
+    React.useEffect(() => {
         if (gameState?.gamePhase === GamePhase.GameOver && user) {
             const humanPlayer = gameState.players.find(p => !p.isBot);
             if (!humanPlayer) return;
-
             const isWinner = gameState.winners?.some(w => w.id === humanPlayer.id) ?? false;
-            
             let finalCoins = humanPlayer.coins;
-            if (isWinner) {
-                const totalPlayers = gameState.players.length;
-                const winBonus = (totalPlayers - 1) * WIN_COINS_PER_PLAYER;
-                finalCoins += winBonus;
-            }
-
-            const updatedUser = { ...user, luduCoins: finalCoins };
-            setUser(updatedUser);
+            if (isWinner) finalCoins += (gameState.players.length - 1) * WIN_COINS_PER_PLAYER;
+            setUser({ ...user, luduCoins: finalCoins });
         }
-    }, [gameState?.gamePhase]);
+    }, [gameState?.gamePhase, user]);
 
+    const ThemeSelectionModal: React.FC<{
+        isOpen: boolean; onClose: () => void; currentTheme: Theme; onSelectTheme: (theme: Theme) => void;
+    }> = ({ isOpen, onClose, currentTheme, onSelectTheme }) => (
+        <Modal isOpen={isOpen} themeConfig={themeConfig}>
+            <div className="text-center">
+                <h2 className={`text-3xl font-bold ${themeConfig.accentTextLight} mb-6`}>Zvolte Vizuální Téma</h2>
+                <div className="grid grid-cols-2 gap-4">
+                    {(Object.keys(themes) as Theme[]).map(themeKey => {
+                        const loopThemeConfig = themes[themeKey];
+                        return (
+                            <button
+                                key={themeKey}
+                                onClick={() => onSelectTheme(themeKey)}
+                                className={`p-4 rounded-lg border-2 transition-all duration-200 ${currentTheme === themeKey ? `${loopThemeConfig.accentBorderOpaque} ${loopThemeConfig.accentShadow.replace('/10','')}` : 'border-gray-600 hover:border-gray-500'}`}
+                            >
+                                <span className={`text-xl font-bold ${loopThemeConfig.accentText}`}>{loopThemeConfig.name}</span>
+                            </button>
+                        );
+                    })}
+                </div>
+                <div className="mt-8">
+                    <NeonButton onClick={onClose} variant="secondary" themeConfig={themeConfig}>Zavřít</NeonButton>
+                </div>
+            </div>
+        </Modal>
+    );
 
   const renderScreen = () => {
     switch (screen) {
       case 'AUTH':
-        return <AuthScreen onLogin={handleLogin} />;
+        return <AuthScreen onLogin={handleLogin} themeConfig={themeConfig}/>;
       case 'LOBBY':
-        if (!user) {
-          return (
-            <div className="min-h-screen flex items-center justify-center">
-              <Spinner />
-            </div>
-          );
-        }
-        return <LobbyScreen user={user} onNavigate={handleNavigate} onGetFreeCoins={() => setIsAdModalOpen(true)} appMetadata={appMetadata} />;
+        if (!user) return <div className="min-h-screen flex items-center justify-center"><Spinner themeConfig={themeConfig} /></div>;
+        return <LobbyScreen user={user} setUser={setUser} onNavigate={handleNavigate} onGetFreeCoins={() => setIsAdModalOpen(true)} onOpenThemeSelector={() => setIsThemeModalOpen(true)} appMetadata={appMetadata} themeConfig={themeConfig} />;
       case 'ONLINE_LOBBY':
-          return <OnlineLobbyScreen onStartGame={handleStartOnlineGame} onBack={() => setScreen('LOBBY')} />;
+          return <OnlineLobbyScreen onStartGame={handleStartOnlineGame} onBack={() => setScreen('LOBBY')} themeConfig={themeConfig} />;
       case 'FINDING_MATCH':
           return <FindingMatchScreen playerCount={onlinePlayerCount} onMatchFound={() => {
               setGameState(createInitialGameState(onlinePlayerCount, true));
               setScreen('GAME');
-          }} />;
+          }} themeConfig={themeConfig} />;
       case 'GAME_SETUP':
-        return <GameSetupScreen onStartGame={handleStartGame} onBack={() => setScreen('LOBBY')} />;
+        return <GameSetupScreen onStartGame={handleStartGame} onBack={() => setScreen('LOBBY')} themeConfig={themeConfig}/>;
       case 'RULES':
-        return <RulesScreen onBack={() => setScreen('LOBBY')} />;
+        return <RulesScreen onBack={() => setScreen('LOBBY')} themeConfig={themeConfig} />;
       case 'GAME':
-        if (!gameState) {
-          return (
-            <div className="min-h-screen flex items-center justify-center">
-              <Spinner />
-            </div>
-          );
-        }
+        if (!gameState) return <div className="min-h-screen flex items-center justify-center"><Spinner themeConfig={themeConfig} /></div>;
         
         const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
         const humanPlayer = gameState.players.find(p => !p.isBot)!;
@@ -1622,7 +1693,7 @@ export default function App() {
 
         const getHeaderText = () => {
             if (gameState.answerResult) return 'Vyhodnocuji...';
-            if (isLoadingQuestion) return 'Načítám...';
+            if (isProcessingQuestion) return 'Načítám...';
             if (gameState.activeQuestion) {
                  if (isHumanAnswering && gameState.activeQuestion.playerAnswers[humanPlayer.id] === null) return 'Odpovězte na otázku!';
                  return 'Soupeř je na tahu...';
@@ -1631,12 +1702,9 @@ export default function App() {
                  if (gameState.phase1Selections?.[humanPlayer.id]) return 'Čekání na ostatní hráče...';
                  return `Kolo ${gameState.round}/${PHASE_DURATIONS.PHASE1_ROUNDS}: Vyberte si území`;
             }
-            
-            const attackers = getAttackers(gameState.players);
-            if (gameState.gamePhase === GamePhase.Phase2_Attacks && attackers.some(p => p.id === humanPlayer.id) && currentPlayer.id === humanPlayer.id) {
+            if (gameState.gamePhase === GamePhase.Phase2_Attacks && getAttackers(gameState.players).some(p => p.id === humanPlayer.id) && currentPlayer.id === humanPlayer.id) {
                 return 'Jste na řadě s útokem!';
             }
-            
             return <>Na tahu: <span className={`font-bold text-${currentPlayer?.color}-400`}>{currentPlayer?.name}</span></>;
         };
         
@@ -1647,104 +1715,86 @@ export default function App() {
             return `${minutes}:${seconds}`;
         };
 
-        const phaseName = gameState.gamePhase.replace("PHASE_1_", "").replace("PHASE_2_", "").replace("PHASE_3_", "").replace(/_/g, ' ');
+        const phaseName = gameState.gamePhase.replace(/PHASE_\d+_/,'').replace(/_/g, ' ');
         const attackers = getAttackers(gameState.players);
         
         return (
-            <div className="min-h-screen bg-gray-900 text-white flex flex-col">
-                 {gameState.gamePhase === GamePhase.GameOver && (
-                    <GameOverScreen gameState={gameState} onBackToLobby={handleBackToLobby} />
-                 )}
-                <header className="bg-gray-800/50 p-4 border-b border-cyan-500/30">
+            <div className="min-h-screen flex flex-col">
+                 {gameState.gamePhase === GamePhase.GameOver && <GameOverScreen gameState={gameState} onBackToLobby={handleBackToLobby} themeConfig={themeConfig} />}
+                <header className={`bg-gray-800/50 p-4 border-b ${themeConfig.accentBorder}`}>
                     <div className="flex justify-between items-center">
                         <div>
-                            <h1 className="text-2xl font-bold text-cyan-400 capitalize">Fáze: {phaseName.toLowerCase()}</h1>
+                            <h1 className={`text-2xl font-bold ${themeConfig.accentText} capitalize`}>Fáze: {phaseName.toLowerCase()}</h1>
                             <p className="text-gray-400">Kolo: {gameState.round}</p>
                         </div>
-                        <div className="text-2xl font-mono text-cyan-300">{formatTime(gameTime)}</div>
-                        <div className="text-right">
-                             <h2 className="text-xl">{getHeaderText()}</h2>
-                        </div>
+                        <div className={`text-2xl font-mono ${themeConfig.accentTextLight}`}>{formatTime(gameTime)}</div>
+                        <div className="text-right"><h2 className="text-xl">{getHeaderText()}</h2></div>
                     </div>
                 </header>
                 <main className="flex-grow flex flex-col md:flex-row overflow-hidden">
                     <div className="flex-grow md:w-2/3 lg:w-3/4 order-2 md:order-1 relative">
                         <HexagonalGameBoard 
-                            board={gameState.board} 
-                            players={gameState.players} 
-                            onFieldClick={handleFieldClick} 
-                            phase1Selections={gameState.phase1Selections} 
-                            gamePhase={gameState.gamePhase}
-                            currentPlayerId={humanPlayer.id}
-                            currentTurnPlayerId={currentPlayer.id}
+                            board={gameState.board} players={gameState.players} onFieldClick={handleFieldClick} 
+                            phase1Selections={gameState.phase1Selections} gamePhase={gameState.gamePhase}
+                            currentPlayerId={humanPlayer.id} currentTurnPlayerId={currentPlayer.id}
+                            rotation={boardRotation} onRotate={handleRotateBoard} themeConfig={themeConfig}
                         />
                     </div>
-                    <aside className="md:w-1/3 lg:w-1/4 bg-gray-900/50 p-4 border-t md:border-t-0 md:border-l border-cyan-500/30 order-1 md:order-2 overflow-y-auto">
-                        <h2 className="text-2xl font-bold text-cyan-300 border-b border-gray-700 pb-2 mb-4">Hráči</h2>
-                        <PlayerStatusUI players={gameState.players} currentPlayerId={currentPlayer?.id} board={gameState.board} />
-                        {gameState.gamePhase === GamePhase.Phase2_Attacks && <AttackOrderUI attackers={attackers} currentPlayerId={currentPlayer?.id} />}
-                        <h2 className="text-2xl font-bold text-cyan-300 border-b border-gray-700 pb-2 mb-4 mt-6">Záznam Hry</h2>
+                    <aside className={`md:w-1/3 lg:w-1/4 bg-gray-900/50 p-4 border-t md:border-t-0 md:border-l ${themeConfig.accentBorder} order-1 md:order-2 overflow-y-auto`}>
+                        <h2 className={`text-2xl font-bold ${themeConfig.accentTextLight} border-b border-gray-700 pb-2 mb-4`}>Hráči</h2>
+                        <PlayerStatusUI players={gameState.players} currentPlayerId={currentPlayer?.id} board={gameState.board} themeConfig={themeConfig} />
+                        {gameState.gamePhase === GamePhase.Phase2_Attacks && <AttackOrderUI attackers={attackers} currentPlayerId={currentPlayer?.id} themeConfig={themeConfig} />}
+                        <h2 className={`text-2xl font-bold ${themeConfig.accentTextLight} border-b border-gray-700 pb-2 mb-4 mt-6`}>Záznam Hry</h2>
                         <div className="h-64 overflow-y-auto bg-gray-800 p-2 rounded-md">
                             {gameState.gameLog.slice().reverse().map((log, i) => <p key={i} className="text-sm text-gray-400 mb-1">{log}</p>)}
                         </div>
                     </aside>
                 </main>
                 
-                {(isLoadingQuestion || (gameState.activeQuestion && isHumanAnswering)) && (
-                     <QuestionModal activeQuestion={gameState.activeQuestion} onAnswer={handleAnswer} onTimeout={() => handleAnswer('timeout_wrong_answer')} loading={isLoadingQuestion} onUseHint={handleUseHint} humanPlayer={humanPlayer} />
+                {(isProcessingQuestion || (gameState.activeQuestion && isHumanAnswering)) && (
+                     <QuestionModal activeQuestion={gameState.activeQuestion} onAnswer={handleAnswer} onTimeout={() => handleAnswer('timeout_wrong_answer')} loading={isProcessingQuestion} onUseHint={handleUseHint} humanPlayer={humanPlayer} themeConfig={themeConfig} />
                 )}
-                
-                {gameState.activeQuestion && !isHumanAnswering && (
-                     <SpectatorQuestionModal activeQuestion={gameState.activeQuestion} />
-                )}
-
-
+                {gameState.activeQuestion && !isHumanAnswering && <SpectatorQuestionModal activeQuestion={gameState.activeQuestion} themeConfig={themeConfig} />}
                 {attackTarget && (
                     <CategorySelectionModal 
                         isOpen={true}
                         availableCategories={CATEGORIES.filter(c => !currentPlayer?.usedAttackCategories.includes(c))}
                         isBaseAttack={attackTarget.isBaseAttack}
                         onSelect={async (category) => {
-                            if(attackTarget.isBaseAttack){
-                                 const field = gameState.board.find(f => f.id === attackTarget.targetFieldId)!;
-                                 await handleCategorySelect(field.category!);
-                            } else {
-                                await handleCategorySelect(category);
-                            }
+                            if(attackTarget.isBaseAttack) await handleCategorySelect(gameState.board.find(f => f.id === attackTarget.targetFieldId)!.category!);
+                            else await handleCategorySelect(category);
                         }}
                         onClose={() => setAttackTarget(null)}
+                        themeConfig={themeConfig}
                     />
                 )}
-
-                {gameState.answerResult && gameState.answerResult.playerId === humanPlayer.id && (
-                     <AnswerFeedbackModal result={gameState.answerResult} />
-                )}
-                
-                {gameState.eliminationResult && (
-                    <EliminationFeedbackModal result={gameState.eliminationResult} />
-                )}
+                {gameState.answerResult && gameState.answerResult.playerId === humanPlayer.id && <AnswerFeedbackModal result={gameState.answerResult} themeConfig={themeConfig} />}
+                {gameState.eliminationResult && <EliminationFeedbackModal result={gameState.eliminationResult} themeConfig={themeConfig} />}
             </div>
         );
       default:
-        if (user) {
-          return (
-            <div className="min-h-screen flex items-center justify-center">
-              <Spinner />
-            </div>
-          );
-        }
-        return <AuthScreen onLogin={handleLogin} />;
+        if (user) return <div className="min-h-screen flex items-center justify-center"><Spinner themeConfig={themeConfig}/></div>;
+        return <AuthScreen onLogin={handleLogin} themeConfig={themeConfig} />;
     }
   };
 
   return (
-    <div className="bg-gray-900">
+    <div>
         <Analytics />
         {renderScreen()}
+        {isThemeModalOpen && <ThemeSelectionModal 
+            isOpen={isThemeModalOpen} 
+            onClose={() => setIsThemeModalOpen(false)}
+            currentTheme={theme}
+            onSelectTheme={(selectedTheme) => {
+                setTheme(selectedTheme);
+                setIsThemeModalOpen(false);
+            }}
+        />}
         {isAdModalOpen && <AdRewardModal onClaim={() => {
             setUser(u => u ? {...u, luduCoins: u.luduCoins + AD_REWARD_COINS} : u);
             setIsAdModalOpen(false);
-        }} />}
+        }} themeConfig={themeConfig} />}
     </div>
   );
 }

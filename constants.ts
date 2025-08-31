@@ -18,6 +18,13 @@ export const PLAYER_COLOR_HEX: { [key: string]: string } = {
   yellow: '#eab308',
 };
 
+export const LANGUAGES: { code: 'cs' | 'en' | 'de' | 'es'; name: string }[] = [
+    { code: 'cs', name: 'Čeština' },
+    { code: 'en', name: 'English' },
+    { code: 'de', name: 'Deutsch' },
+    { code: 'es', name: 'Español' },
+];
+
 export const INITIAL_COINS = 1000;
 export const WIN_COINS_PER_PLAYER = 50;
 export const AD_REWARD_COINS = 150;

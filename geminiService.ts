@@ -1,156 +1,123 @@
+import { GoogleGenAI } from "@google/genai";
+import type { Question, Language, Category } from '../types';
+import { questionBank } from './questionBank';
 
-
-
-import { GoogleGenAI, Type } from "@google/genai";
-import type { Question } from '../types';
-import { Category } from '../types';
-
-const apiKey = process.env.API_KEY;
-
-if (!apiKey) {
-    console.warn("API klíč pro Gemini není nastaven. Prosím nastavte proměnnou prostředí API_KEY. Bude použita mock implementace.");
-}
-
-// If apiKey is undefined, the mock logic below will prevent calls to the Gemini API.
-const ai = new GoogleGenAI({ apiKey: apiKey! });
-
-const multipleChoiceSchema = {
-  type: Type.OBJECT,
-  properties: {
-    question: {
-      type: Type.STRING,
-      description: "Vědomostní otázka v češtině."
-    },
-    options: {
-      type: Type.ARRAY,
-      items: { type: Type.STRING },
-      description: "Pole přesně 4 možných odpovědí."
-    },
-    correctAnswer: {
-      type: Type.STRING,
-      description: "Správná odpověď, která musí být jedním z řetězců v poli možností."
-    }
-  },
-  required: ["question", "options", "correctAnswer"]
-};
-
-const openEndedSchema = {
-  type: Type.OBJECT,
-  properties: {
-    question: {
-      type: Type.STRING,
-      description: "Vědomostní otázka v češtině, na kterou se dá odpovědět jedním nebo dvěma slovy."
-    },
-    correctAnswer: {
-      type: Type.STRING,
-      description: "Stručná a přesná správná odpověď."
-    }
-  },
-  required: ["question", "correctAnswer"]
-};
-
-const parseJsonResponse = (jsonText: string): any => {
-    const cleanedJson = jsonText.replace(/^```json\s*|```$/g, '');
-    try {
-        return JSON.parse(cleanedJson);
-    } catch (e) {
-        console.error("Failed to parse JSON response:", cleanedJson);
-        return null;
-    }
-};
-
-export const generateQuestion = async (category: Category, history: string[] = []): Promise<Question | null> => {
-  if (!apiKey) {
-    const mockAnswer = (Math.random() * 100).toFixed(0);
-    return {
-      question: `Toto je mock otázka pro ${category}. Jaký je výsledek? ${mockAnswer}`,
-      options: [mockAnswer, "Špatně 1", "Špatně 2", "Špatně 3"].sort(() => Math.random() - 0.5),
-      correctAnswer: mockAnswer,
-    };
-  }
-
-  try {
-    const historyPrompt = history.length > 0 ? `Vyhni se otázkám podobným těmto: "${history.slice(-10).join('; ')}"` : "";
-    const prompt = `Vygeneruj obtížnou vědomostní otázku v češtině z kategorie ${category}. Otázka musí mít přesně 4 možnosti (multiple-choice) a jedna z nich musí být správná. Obtížnost by měla být střední. ${historyPrompt}`;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: multipleChoiceSchema,
-        temperature: 0.9,
-      }
-    });
-
-    const data = parseJsonResponse(response.text);
-    
-    if (data && data.question && data.options && data.options.length === 4 && data.correctAnswer && data.options.includes(data.correctAnswer)) {
-      return data as Question;
-    }
-    console.error("Vygenerovaná otázka (MC) selhala validací:", data);
-    return null;
-  } catch (error) {
-    console.error("Chyba při generování otázky z Gemini:", error);
-    return null;
-  }
-};
-
-export const generateOpenEndedQuestion = async (category: Category, previousQuestion: string, history: string[] = []): Promise<Question | null> => {
-  if (!apiKey) {
-    return {
-      question: `Toto je mock otevřená otázka pro ${category}. Napište 'test'.`,
-      correctAnswer: "test",
-    };
-  }
-
-  try {
-    const historyPrompt = history.length > 0 ? `Vyhni se otázkám podobným těmto: "${history.slice(-10).join('; ')}"` : "";
-    const prompt = `Předchozí otázka byla: "${previousQuestion}". Vygeneruj navazující, ale těžší otevřenou otázku v češtině ze stejné kategorie (${category}), na kterou se dá odpovědět jedním nebo dvěma slovy. Neposkytuj žádné možnosti. ${historyPrompt}`;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: openEndedSchema,
-        temperature: 0.8,
-      }
-    });
-
-    const data = parseJsonResponse(response.text);
-
-    if (data && data.question && data.correctAnswer) {
-      return { question: data.question, correctAnswer: data.correctAnswer, options: [] };
-    }
-    console.error("Vygenerovaná otázka (Open) selhala validací:", data);
-    return null;
-  } catch (error) {
-    console.error("Chyba při generování otevřené otázky z Gemini:", error);
-    return null;
-  }
-};
-
-
-export const generateLobbyIntro = async (appName: string, appDescription: string, userName: string): Promise<string | null> => {
+const getApiKey = (): string | undefined => {
+    const apiKey = process.env.API_KEY;
     if (!apiKey) {
-        return `Vítej v aréně, ${userName}! Dokaž své znalosti ve hře ${appName} a dobyj území. Hodně štěstí!`;
+        console.warn("API klíč pro Gemini není nastaven. Překlady a generování úvodu budou deaktivovány.");
+        return undefined;
+    }
+    return apiKey;
+};
+
+const getQuestionFromBank = (category: Category, history: string[]): Question | null => {
+    const categoryQuestions = questionBank[category]?.multipleChoice;
+    if (!categoryQuestions || categoryQuestions.length === 0) return null;
+
+    const availableQuestions = categoryQuestions.filter(q => !history.includes(q.question));
+    if (availableQuestions.length > 0) {
+        return availableQuestions[Math.floor(Math.random() * availableQuestions.length)];
+    }
+    // Fallback to all questions if all have been used
+    return categoryQuestions[Math.floor(Math.random() * categoryQuestions.length)];
+};
+
+const getOpenEndedQuestionFromBank = (category: Category, history: string[]): Question | null => {
+    const categoryQuestions = questionBank[category]?.openEnded;
+    if (!categoryQuestions || categoryQuestions.length === 0) return null;
+    
+    const availableQuestions = categoryQuestions.filter(q => !history.includes(q.question));
+     if (availableQuestions.length > 0) {
+        return availableQuestions[Math.floor(Math.random() * availableQuestions.length)];
+    }
+    return categoryQuestions[Math.floor(Math.random() * categoryQuestions.length)];
+};
+
+const normalizeAnswer = (answer: string): string => {
+    if (typeof answer !== 'string') return '';
+    return answer.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+};
+
+const translateQuestionPayload = async (question: Question, targetLang: Language): Promise<Question> => {
+    const apiKey = getApiKey();
+    if (!apiKey || targetLang === 'cs') return question;
+
+    const ai = new GoogleGenAI({ apiKey });
+
+    const sourceObject: any = {
+        question: question.question,
+        correctAnswer: question.correctAnswer
+    };
+    if (question.options && question.options.length > 0) {
+        sourceObject.options = question.options;
     }
 
     try {
-        const prompt = `Jsi AI hostitel hry s názvem '${appName}'. Popis hry je: '${appDescription}'. Napiš krátký, energický a přátelský pozdrav pro hráče jménem '${userName}', který ho vítá v lobby. Zmiň se stručně o tom, že se jedná o souboj vědomostí a dobývání území. Buď stručný (maximálně 2-3 věty) a mluv česky.`;
+        const prompt = `First, translate the values in the following JSON object from Czech to English. Then, translate the English values to the language with code '${targetLang}'.
+Maintain the original JSON structure. Respond ONLY with the final translated JSON object, without any markdown formatting.
+
+Input:
+${JSON.stringify(sourceObject, null, 2)}`;
 
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
-            config: {
-                temperature: 0.7,
-            }
+            config: { temperature: 0.1, responseMimeType: "application/json" }
         });
 
+        const cleanedJson = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
+        const translatedObject = JSON.parse(cleanedJson);
+
+        const finalQuestion: Question = {
+            question: translatedObject.question || question.question,
+            correctAnswer: translatedObject.correctAnswer || question.correctAnswer,
+            options: translatedObject.options || question.options
+        };
+
+        if (finalQuestion.options && Array.isArray(finalQuestion.options)) {
+            const correctOption = finalQuestion.options.find(opt => normalizeAnswer(opt) === normalizeAnswer(finalQuestion.correctAnswer));
+            finalQuestion.correctAnswer = correctOption || finalQuestion.correctAnswer;
+        }
+
+        return finalQuestion;
+
+    } catch (error) {
+        console.error("Chyba při překladu celé otázky:", error);
+        return question; // Fallback to original question
+    }
+};
+
+export const generateQuestion = async (category: Category, history: string[], targetLang: Language): Promise<Question | null> => {
+    const baseQuestion = getQuestionFromBank(category, history);
+    if (!baseQuestion) return null;
+    return translateQuestionPayload(baseQuestion, targetLang);
+};
+
+export const generateOpenEndedQuestion = async (category: Category, history: string[], targetLang: Language): Promise<Question | null> => {
+    const baseQuestion = getOpenEndedQuestionFromBank(category, history);
+    if (!baseQuestion) return null;
+    return translateQuestionPayload(baseQuestion, targetLang);
+};
+
+export const generateLobbyIntro = async (appName: string, appDescription: string, userName: string): Promise<string | null> => {
+    const apiKey = getApiKey();
+    const defaultIntro = `Vítej v aréně, ${userName}! Dokaž své znalosti ve hře ${appName} a dobyj území. Hodně štěstí!`;
+    if (!apiKey) {
+        return defaultIntro;
+    }
+    
+    try {
+        const ai = new GoogleGenAI({ apiKey });
+        const prompt = `Jsi AI hostitel hry s názvem '${appName}'. Popis hry je: '${appDescription}'. Napiš krátký, energický a přátelský pozdrav pro hráče jménem '${userName}', který ho vítá v lobby. Zmiň se stručně o tom, že se jedná o souboj vědomostí a dobývání území. Buď stručný (maximálně 2-3 věty) a mluv česky.`;
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: { temperature: 0.7 }
+        });
         return response.text.trim();
     } catch (error) {
         console.error("Chyba při generování úvodu do lobby z Gemini:", error);
-        return null;
+        return defaultIntro;
     }
 };
