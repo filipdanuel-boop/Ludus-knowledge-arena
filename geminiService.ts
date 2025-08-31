@@ -1,16 +1,16 @@
 
+
+
 import { GoogleGenAI, Type } from "@google/genai";
 import type { Question } from '../types';
 import { Category } from '../types';
 
-// FIX: Per @google/genai guidelines, API key must be from process.env.API_KEY.
 const apiKey = process.env.API_KEY;
 
 if (!apiKey) {
     console.warn("API klíč pro Gemini není nastaven. Prosím nastavte proměnnou prostředí API_KEY. Bude použita mock implementace.");
 }
 
-// FIX: Per @google/genai guidelines, initialize with apiKey from env var.
 // If apiKey is undefined, the mock logic below will prevent calls to the Gemini API.
 const ai = new GoogleGenAI({ apiKey: apiKey! });
 
@@ -60,7 +60,6 @@ const parseJsonResponse = (jsonText: string): any => {
 };
 
 export const generateQuestion = async (category: Category, history: string[] = []): Promise<Question | null> => {
-  // FIX: Switched to check for API key existence for mock data fallback.
   if (!apiKey) {
     const mockAnswer = (Math.random() * 100).toFixed(0);
     return {
@@ -98,7 +97,6 @@ export const generateQuestion = async (category: Category, history: string[] = [
 };
 
 export const generateOpenEndedQuestion = async (category: Category, previousQuestion: string, history: string[] = []): Promise<Question | null> => {
-  // FIX: Switched to check for API key existence for mock data fallback.
   if (!apiKey) {
     return {
       question: `Toto je mock otevřená otázka pro ${category}. Napište 'test'.`,
@@ -131,4 +129,28 @@ export const generateOpenEndedQuestion = async (category: Category, previousQues
     console.error("Chyba při generování otevřené otázky z Gemini:", error);
     return null;
   }
+};
+
+
+export const generateLobbyIntro = async (appName: string, appDescription: string, userName: string): Promise<string | null> => {
+    if (!apiKey) {
+        return `Vítej v aréně, ${userName}! Dokaž své znalosti ve hře ${appName} a dobyj území. Hodně štěstí!`;
+    }
+
+    try {
+        const prompt = `Jsi AI hostitel hry s názvem '${appName}'. Popis hry je: '${appDescription}'. Napiš krátký, energický a přátelský pozdrav pro hráče jménem '${userName}', který ho vítá v lobby. Zmiň se stručně o tom, že se jedná o souboj vědomostí a dobývání území. Buď stručný (maximálně 2-3 věty) a mluv česky.`;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: {
+                temperature: 0.7,
+            }
+        });
+
+        return response.text.trim();
+    } catch (error) {
+        console.error("Chyba při generování úvodu do lobby z Gemini:", error);
+        return null;
+    }
 };

@@ -2,8 +2,8 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Analytics } from '@vercel/analytics/react';
 import { Category, Field, FieldType, GamePhase, GameState, Player, Question, User, QuestionType } from './types';
-import { CATEGORIES, MAP_CONFIG, PLAYER_COLORS, INITIAL_COINS, POINTS, PHASE_DURATIONS, HINT_COSTS, PLAYER_COLOR_HEX, BASE_HP, FIELD_HP, AD_REWARD_COINS, BOT_NAMES, ELIMINATION_COIN_BONUS, WIN_COINS_PER_PLAYER } from './constants';
-import { generateQuestion, generateOpenEndedQuestion } from './services/geminiService';
+import { CATEGORIES, PLAYER_COLORS, INITIAL_COINS, POINTS, PHASE_DURATIONS, HINT_COSTS, PLAYER_COLOR_HEX, BASE_HP, FIELD_HP, AD_REWARD_COINS, BOT_NAMES, ELIMINATION_COIN_BONUS, WIN_COINS_PER_PLAYER, EMAIL_VERIFICATION_BONUS } from './constants';
+import { generateQuestion, generateOpenEndedQuestion, generateLobbyIntro } from './services/geminiService';
 
 const ANSWER_TIME_LIMIT = 15; // 15 sekund na odpověď
 
@@ -78,23 +78,62 @@ const OnlinePlayerCounter: React.FC = () => {
 // --- OBRAZOVKY ---
 
 const AuthScreen: React.FC<{ onLogin: (user: User) => void }> = ({ onLogin }) => {
-  const [isLogin, setIsLogin] = useState(true);
+  const [authMode, setAuthMode] = useState<'login' | 'register' | 'verify'>('login');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [errors, setErrors] = useState<{ email?: string; password?: string; code?: string }>({});
+
+  const validate = () => {
+    const newErrors: { email?: string; password?: string } = {};
+    if (!email) {
+      newErrors.email = "Email je povinný.";
+    } else if (!/\S+@\S+\.\S+/.test(email)) {
+      newErrors.email = "Neplatný formát emailu.";
+    }
+
+    if (!password) {
+      newErrors.password = "Heslo je povinné.";
+    } else if (password.length < 6) {
+      newErrors.password = "Heslo musí mít alespoň 6 znaků.";
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // V reálné aplikaci by zde byla logika pro načtení/vytvoření v DB.
-    // Nyní jen simulujeme a ukládáme lokálně.
+    if (!validate()) return;
+    
+    if (authMode === 'login') {
+        const storedHistory = localStorage.getItem('ludus_question_history');
+        const questionHistory = storedHistory ? JSON.parse(storedHistory) : [];
+        onLogin({ email, luduCoins: INITIAL_COINS, questionHistory });
+    } else {
+        // Switch to verification view after registration
+        setAuthMode('verify');
+    }
+  };
+
+  const handleVerify = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (verificationCode.length < 6) {
+        setErrors({ code: "Kód musí mít 6 znaků." });
+        return;
+    }
+    setErrors({});
+    
+    // In a real app, you'd verify the code against a backend.
+    // Here, we just log in and give the bonus.
     const storedHistory = localStorage.getItem('ludus_question_history');
     const questionHistory = storedHistory ? JSON.parse(storedHistory) : [];
     
-    const user: User = { 
-      email: "hrac@ludus.com", // Zde by byl email z formuláře
-      luduCoins: INITIAL_COINS, 
-      questionHistory 
-    };
-    
-    localStorage.setItem('ludus_user', JSON.stringify(user));
-    onLogin(user);
+    onLogin({ 
+        email, 
+        luduCoins: INITIAL_COINS + EMAIL_VERIFICATION_BONUS, 
+        questionHistory 
+    });
   };
 
   return (
@@ -104,48 +143,141 @@ const AuthScreen: React.FC<{ onLogin: (user: User) => void }> = ({ onLogin }) =>
         <p className="text-gray-400 text-xl mt-2">Aréna Vědomostí</p>
       </div>
       <div className="w-full max-w-md bg-gray-800 p-8 rounded-lg border border-cyan-500/30 shadow-2xl shadow-cyan-500/10">
-        <h2 className="text-3xl font-bold text-center mb-6 text-cyan-300">{isLogin ? 'Přihlášení' : 'Registrace'}</h2>
-        <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label className="block text-gray-400 mb-2" htmlFor="email">Email</label>
-            <input type="email" id="email" defaultValue="hrac@ludus.com" className="w-full p-3 bg-gray-700 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-cyan-500" />
-          </div>
-          <div className="mb-6">
-            <label className="block text-gray-400 mb-2" htmlFor="password">Heslo</label>
-            <input type="password" id="password" defaultValue="password" className="w-full p-3 bg-gray-700 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-cyan-500" />
-          </div>
-          <NeonButton type="submit" className="w-full">{isLogin ? 'Vstoupit do Arény' : 'Vytvořit Účet'}</NeonButton>
-        </form>
-        <p className="text-center mt-6 text-gray-500">
-          <button onClick={() => setIsLogin(!isLogin)} className="text-cyan-400 hover:underline">
-            {isLogin ? "Potřebujete účet? Zaregistrujte se" : "Už máte účet? Přihlaste se"}
-          </button>
-        </p>
+        {authMode === 'verify' ? (
+             <div>
+                <h2 className="text-3xl font-bold text-center mb-4 text-cyan-300">Ověření Účtu</h2>
+                <p className="text-gray-400 text-center mb-6">Zadejte 6místný kód, který jsme vám zaslali na email. Jako odměnu získáte <span className="font-bold text-yellow-400">{EMAIL_VERIFICATION_BONUS}</span> LuduCoinů!</p>
+                <form onSubmit={handleVerify} noValidate>
+                    <div className="mb-4">
+                        <label className="block text-gray-400 mb-2" htmlFor="code">Ověřovací Kód</label>
+                        <input 
+                          type="text" 
+                          id="code" 
+                          maxLength={6}
+                          value={verificationCode}
+                          onChange={e => setVerificationCode(e.target.value)}
+                          className={`w-full p-3 bg-gray-700 rounded border text-center tracking-[0.5em] text-2xl ${errors.code ? 'border-red-500' : 'border-gray-600'} focus:outline-none focus:ring-2 focus:ring-cyan-500`} 
+                        />
+                         {errors.code && <p className="text-red-500 text-sm mt-1">{errors.code}</p>}
+                    </div>
+                    <NeonButton type="submit" className="w-full">Ověřit a Získat Bonus</NeonButton>
+                </form>
+             </div>
+        ) : (
+            <>
+                <h2 className="text-3xl font-bold text-center mb-6 text-cyan-300">{authMode === 'login' ? 'Přihlášení' : 'Registrace'}</h2>
+                <form onSubmit={handleSubmit} noValidate>
+                  <div className="mb-4">
+                    <label className="block text-gray-400 mb-2" htmlFor="email">Email</label>
+                    <input 
+                      type="email" 
+                      id="email" 
+                      value={email}
+                      onChange={e => setEmail(e.target.value)}
+                      className={`w-full p-3 bg-gray-700 rounded border ${errors.email ? 'border-red-500' : 'border-gray-600'} focus:outline-none focus:ring-2 focus:ring-cyan-500`} 
+                    />
+                    {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
+                  </div>
+                  <div className="mb-6">
+                    <label className="block text-gray-400 mb-2" htmlFor="password">Heslo</label>
+                    <input 
+                      type="password" 
+                      id="password" 
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      className={`w-full p-3 bg-gray-700 rounded border ${errors.password ? 'border-red-500' : 'border-gray-600'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                    />
+                    {errors.password && <p className="text-red-500 text-sm mt-1">{errors.password}</p>}
+                  </div>
+                  <NeonButton type="submit" className="w-full">{authMode === 'login' ? 'Vstoupit do Arény' : 'Vytvořit Účet'}</NeonButton>
+                </form>
+                <p className="text-center mt-6 text-gray-500">
+                  <button onClick={() => {
+                    setAuthMode(authMode === 'login' ? 'register' : 'login');
+                    setErrors({}); // Clear errors when switching modes
+                  }} className="text-cyan-400 hover:underline">
+                    {authMode === 'login' ? "Potřebujete účet? Zaregistrujte se" : "Už máte účet? Přihlaste se"}
+                  </button>
+                </p>
+            </>
+        )}
       </div>
     </div>
   );
 };
 
-const LobbyScreen: React.FC<{ user: User; onNavigate: (screen: string) => void; onGetFreeCoins: () => void; }> = ({ user, onNavigate, onGetFreeCoins }) => {
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white p-4">
-        <div className="absolute top-4 right-4 bg-gray-800 border border-cyan-500/30 p-3 rounded-lg text-center flex items-center gap-4">
-            <p className="text-cyan-400 font-bold">{user.email}</p>
-            <div className="flex items-center gap-2">
-              <LuduCoin />
-              <p className="text-yellow-400 text-lg font-bold">{user.luduCoins.toLocaleString()}</p>
+const LobbyScreen: React.FC<{ 
+    user: User; 
+    onNavigate: (screen: string) => void; 
+    onGetFreeCoins: () => void; 
+    appMetadata: { name: string, description: string } | null;
+}> = ({ user, onNavigate, onGetFreeCoins, appMetadata }) => {
+    const [introText, setIntroText] = useState<string | null>(null);
+
+    useEffect(() => {
+        const userName = user.email.split('@')[0];
+        const defaultIntro = `Vítej v aréně, ${userName}! Dokaž své znalosti a dobyj území.`;
+        if (appMetadata) {
+            generateLobbyIntro(appMetadata.name, appMetadata.description, userName)
+                .then(text => {
+                    setIntroText(text || defaultIntro);
+                })
+                .catch(() => {
+                    setIntroText(defaultIntro);
+                });
+        } else {
+            setIntroText(defaultIntro);
+        }
+    }, [appMetadata, user.email]);
+
+    return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white p-4">
+            <div className="absolute top-4 right-4 bg-gray-800 border border-cyan-500/30 p-3 rounded-lg text-center flex items-center gap-4">
+                <p className="text-cyan-400 font-bold">{user.email}</p>
+                <div className="flex items-center gap-2">
+                <LuduCoin />
+                <p className="text-yellow-400 text-lg font-bold">{user.luduCoins.toLocaleString()}</p>
+                </div>
             </div>
+            <h1 className="text-6xl font-bold text-cyan-400 mb-4 animate-pulse-bright">Hlavní Lobby</h1>
+            {introText ? (
+                <p className="text-center text-xl text-gray-300 mb-8 max-w-2xl animate-fade-in">{introText}</p>
+            ) : (
+                <div className="h-8 bg-gray-700/50 rounded w-3/4 md:w-1/2 mx-auto mb-8 animate-pulse"></div>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-3xl">
+                <div className="flex flex-col items-center">
+                    <NeonButton onClick={() => onNavigate('GAME_SETUP')} className="w-full h-24 text-2xl">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                        Hrát Lokálně
+                    </NeonButton>
+                    <p className="text-gray-400 mt-2 text-center">Hrajte proti botům na jednom zařízení.</p>
+                </div>
+                <div className="flex flex-col items-center">
+                    <NeonButton onClick={() => onNavigate('ONLINE_LOBBY')} className="w-full h-24 text-2xl">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2h10a2 2 0 002-2v-1a2 2 0 012-2h1.945M7.707 4.293a1 1 0 010 1.414L5.414 8l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L18.586 8l-2.293-2.293a1 1 0 010-1.414z" /></svg>
+                        Hrát Online <span className="text-xs bg-rose-500 text-white px-2 py-1 rounded-full">BETA</span>
+                    </NeonButton>
+                    <p className="text-gray-400 mt-2 text-center">Vyzvěte ostatní hráče z celého světa.</p>
+                </div>
+                <div className="flex flex-col items-center">
+                    <NeonButton onClick={onGetFreeCoins} variant="secondary" className="w-full h-24 text-2xl">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        Získat Coiny Zdarma
+                    </NeonButton>
+                    <p className="text-gray-400 mt-2 text-center">Sledujte reklamu a získejte odměnu.</p>
+                </div>
+                <div className="flex flex-col items-center">
+                    <NeonButton onClick={() => onNavigate('RULES')} variant="secondary" className="w-full h-24 text-2xl">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                        Pravidla
+                    </NeonButton>
+                    <p className="text-gray-400 mt-2 text-center">Naučte se, jak se stát šampionem.</p>
+                </div>
+            </div>
+            <OnlinePlayerCounter />
         </div>
-      <h1 className="text-6xl font-bold text-cyan-400 mb-12 animate-pulse-bright">Hlavní Lobby</h1>
-      <div className="flex flex-col gap-6 w-full max-w-md">
-         <NeonButton onClick={() => onNavigate('GAME_SETUP')} className="w-full h-20 text-2xl">Hrát Lokálně</NeonButton>
-         <NeonButton onClick={() => onNavigate('ONLINE_LOBBY')} className="w-full h-20 text-2xl">Hrát Online <span className="text-xs bg-rose-500 text-white px-2 py-1 rounded-full">BETA</span></NeonButton>
-         <NeonButton onClick={onGetFreeCoins} variant="secondary" className="w-full h-20 text-2xl">Získat Coiny Zdarma</NeonButton>
-         <NeonButton onClick={() => onNavigate('RULES')} variant="secondary" className="w-full h-20 text-2xl">Pravidla</NeonButton>
-      </div>
-      <OnlinePlayerCounter />
-    </div>
-  );
+    );
 };
 
 const OnlineLobbyScreen: React.FC<{ onStartGame: (playerCount: number) => void; onBack: () => void; }> = ({ onStartGame, onBack }) => (
@@ -256,6 +388,9 @@ const RulesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
 const GameOverScreen: React.FC<{ gameState: GameState; onBackToLobby: () => void }> = ({ gameState, onBackToLobby }) => {
     const { winners } = gameState;
+    const humanPlayer = gameState.players.find(p => !p.isBot);
+    const humanIsWinner = humanPlayer && winners?.some(w => w.id === humanPlayer.id);
+    const winBonus = humanIsWinner ? (gameState.players.length - 1) * WIN_COINS_PER_PLAYER : 0;
 
     return (
         <Modal isOpen={true}>
@@ -268,6 +403,12 @@ const GameOverScreen: React.FC<{ gameState: GameState; onBackToLobby: () => void
                     </>
                 ) : (
                     <p className="text-2xl text-gray-400 mb-6">Hra skončila remízou.</p>
+                )}
+                
+                {humanIsWinner && (
+                    <div className="my-4 p-3 bg-yellow-500/20 border border-yellow-500 rounded-lg inline-block">
+                        <p className="text-yellow-300 font-bold text-lg">Bonus za vítězství: +{winBonus.toLocaleString()} <LuduCoin className="w-6 h-6 inline-block" /></p>
+                    </div>
                 )}
                 
                 <h3 className="text-xl text-cyan-300 mb-3 border-t border-gray-700 pt-4">Konečné pořadí:</h3>
@@ -542,8 +683,6 @@ const QuestionModal: React.FC<{
         setWrittenAnswer(""); // Reset on new question
     }, [activeQuestion?.question.question]);
 
-    if (!activeQuestion && !loading) return null;
-
     const canAffordHint = humanPlayer.coins >= HINT_COSTS.AUTO_ANSWER;
     const isAnswering = activeQuestion && activeQuestion.playerAnswers[humanPlayer.id] === null;
     const isHealing = activeQuestion?.actionType === 'HEAL';
@@ -621,7 +760,7 @@ const QuestionModal: React.FC<{
     );
 };
 
-const SpectatorQuestionModal: React.FC<{ activeQuestion: GameState['activeQuestion'] }> = ({ activeQuestion }) => {
+const SpectatorQuestionModal: React.FC<{ activeQuestion: GameState['activeQuestion'] | null }> = ({ activeQuestion }) => {
     if (!activeQuestion) return null;
     const { question, questionType } = activeQuestion;
     return (
@@ -648,15 +787,14 @@ const SpectatorQuestionModal: React.FC<{ activeQuestion: GameState['activeQuesti
     );
 };
 
-const AnswerFeedbackModal: React.FC<{ result: GameState['answerResult']; humanPlayerId: string }> = ({ result, humanPlayerId }) => {
-    if (!result || result.playerId !== humanPlayerId) return null;
-
+const AnswerFeedbackModal: React.FC<{ result: GameState['answerResult'] | null }> = ({ result }) => {
+    if (!result) return null;
     const { isCorrect, correctAnswer } = result;
-    const animationClass = isCorrect ? 'animate-fade-in' : 'animate-shake';
+    const animationClass = isCorrect ? 'animate-flash-green' : 'animate-shake';
     
     return (
-        <div className={`fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4 ${animationClass}`}>
-            <div className={`p-8 rounded-lg text-center w-full max-w-md border-4 ${isCorrect ? 'border-green-500 bg-green-500/10' : 'border-red-500 bg-red-500/10'}`}>
+        <div className={`fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4 animate-fade-in`}>
+            <div className={`p-8 rounded-lg text-center w-full max-w-md border-4 ${isCorrect ? 'border-green-500 bg-green-500/10' : 'border-red-500 bg-red-500/10'} ${animationClass}`}>
                 <h2 className={`text-5xl font-bold mb-4 ${isCorrect ? 'text-green-400' : 'text-red-400'}`}>
                     {isCorrect ? "Správně!" : "Špatně!"}
                 </h2>
@@ -668,7 +806,7 @@ const AnswerFeedbackModal: React.FC<{ result: GameState['answerResult']; humanPl
     );
 };
 
-const EliminationFeedbackModal: React.FC<{ result: GameState['eliminationResult'] }> = ({ result }) => {
+const EliminationFeedbackModal: React.FC<{ result: GameState['eliminationResult'] | null }> = ({ result }) => {
     if (!result) return null;
     return (
         <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4 animate-fade-in">
@@ -738,22 +876,19 @@ export default function App() {
   const [gameTime, setGameTime] = useState(0);
   const [isAdModalOpen, setIsAdModalOpen] = useState(false);
   const [onlinePlayerCount, setOnlinePlayerCount] = useState(2);
+  const [appMetadata, setAppMetadata] = useState<{name: string, description: string} | null>(null);
 
 
   const gameLogicTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const botTurnTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Efekt pro automatické přihlášení
   useEffect(() => {
-    const savedUserJson = localStorage.getItem('ludus_user');
-    if (savedUserJson) {
-      const savedUser = JSON.parse(savedUserJson);
-      // Zde by v reálné aplikaci proběhla validace session/tokenu
-      handleLogin(savedUser);
-    }
+    fetch('/metadata.json')
+        .then(res => res.json())
+        .then(data => setAppMetadata(data))
+        .catch(err => console.error("Failed to load metadata:", err));
   }, []);
-
-
+  
   useEffect(() => {
     const timer = setInterval(() => {
       if (gameState && gameState.gamePhase !== GamePhase.GameOver) {
@@ -788,45 +923,52 @@ export default function App() {
               isEliminated: false,
           }
       });
-
-      const config = MAP_CONFIG[playerCount as keyof typeof MAP_CONFIG];
+      
+      const radius = playerCount <= 2 ? 1 : 2;
       let board: Field[] = [];
       let fieldIdCounter = 0;
-      
-      for (let r = 0; r < config.height; r++) {
-        for (let q = 0; q < config.width; q++) {
-          board.push({ id: fieldIdCounter++, q, r, type: FieldType.Empty, ownerId: null, category: null, hp: 0, maxHp: 0 });
+
+      for (let q = -radius; q <= radius; q++) {
+        for (let r = Math.max(-radius, -q - radius); r <= Math.min(radius, -q + radius); r++) {
+            board.push({ id: fieldIdCounter++, q, r, type: FieldType.Empty, ownerId: null, category: null, hp: 0, maxHp: 0 });
         }
       }
 
-      // Place bases in corners
-      const basePositions = [
-          {q: 0, r: 0},
-          {q: config.width - 1, r: config.height - 1},
-          {q: config.width - 1, r: 0},
-          {q: 0, r: config.height - 1}
-      ];
+      const basePositions = playerCount <= 2
+        ? [{ q: 1, r: -1 }, { q: -1, r: 1 }]
+        : [{ q: 2, r: 0 }, { q: -2, r: 0 }, { q: 1, r: -2 }, { q: -1, r: 2 }];
+
+      const assignedBaseCoords = new Set<string>();
 
       players.forEach((player, i) => {
           const pos = basePositions[i];
+          const coordKey = `${pos.q},${pos.r}`;
           const baseField = board.find(f => f.q === pos.q && f.r === pos.r)!;
           baseField.type = FieldType.PlayerBase;
           baseField.ownerId = player.id;
           baseField.category = player.mainBaseCategory;
           baseField.hp = BASE_HP;
           baseField.maxHp = BASE_HP;
+          assignedBaseCoords.add(coordKey);
       });
 
-      const neutralFieldsNeeded = playerCount * PHASE_DURATIONS.PHASE1_ROUNDS;
-      const emptyFields = board.filter(f => f.type === FieldType.Empty);
+      const neutralFields = board.filter(f => {
+          const coordKey = `${f.q},${f.r}`;
+          return !assignedBaseCoords.has(coordKey);
+      });
       
-      for (let i = 0; i < neutralFieldsNeeded && i < emptyFields.length; i++) {
-        const field = emptyFields[i];
-        field.type = FieldType.Neutral;
-        field.category = CATEGORIES[i % CATEGORIES.length];
-        field.hp = FIELD_HP;
-        field.maxHp = FIELD_HP;
+      // Shuffle neutral fields for random category assignment
+      for (let i = neutralFields.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [neutralFields[i], neutralFields[j]] = [neutralFields[j], neutralFields[i]];
       }
+
+      neutralFields.forEach((field, i) => {
+          field.type = FieldType.Neutral;
+          field.category = CATEGORIES[i % CATEGORIES.length];
+          field.hp = FIELD_HP;
+          field.maxHp = FIELD_HP;
+      });
       
       return {
           players,
@@ -1239,7 +1381,7 @@ export default function App() {
              // If all have answered, set a timeout to finalize the turn after showing feedback
             gameLogicTimeoutRef.current = setTimeout(() => {
                 finalizeTurnResolution(newStateWithFeedback);
-            }, 3000);
+            }, 2000);
         }
 
         return newStateWithFeedback;
@@ -1437,7 +1579,6 @@ export default function App() {
 
             const updatedUser = { ...user, luduCoins: finalCoins };
             setUser(updatedUser);
-            localStorage.setItem('ludus_user', JSON.stringify(updatedUser));
         }
     }, [gameState?.gamePhase]);
 
@@ -1454,7 +1595,7 @@ export default function App() {
             </div>
           );
         }
-        return <LobbyScreen user={user} onNavigate={handleNavigate} onGetFreeCoins={() => setIsAdModalOpen(true)} />;
+        return <LobbyScreen user={user} onNavigate={handleNavigate} onGetFreeCoins={() => setIsAdModalOpen(true)} appMetadata={appMetadata} />;
       case 'ONLINE_LOBBY':
           return <OnlineLobbyScreen onStartGame={handleStartOnlineGame} onBack={() => setScreen('LOBBY')} />;
       case 'FINDING_MATCH':
@@ -1474,9 +1615,7 @@ export default function App() {
             </div>
           );
         }
-        if (gameState.gamePhase === GamePhase.GameOver) {
-            return <GameOverScreen gameState={gameState} onBackToLobby={handleBackToLobby} />;
-        }
+        
         const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
         const humanPlayer = gameState.players.find(p => !p.isBot)!;
         const isHumanAnswering = gameState.activeQuestion?.playerAnswers.hasOwnProperty(humanPlayer.id);
@@ -1488,7 +1627,10 @@ export default function App() {
                  if (isHumanAnswering && gameState.activeQuestion.playerAnswers[humanPlayer.id] === null) return 'Odpovězte na otázku!';
                  return 'Soupeř je na tahu...';
             }
-            if (gameState.gamePhase === GamePhase.Phase1_LandGrab) return `Kolo ${gameState.round}/${PHASE_DURATIONS.PHASE1_ROUNDS}: Vyberte si území`;
+            if (gameState.gamePhase === GamePhase.Phase1_LandGrab) {
+                 if (gameState.phase1Selections?.[humanPlayer.id]) return 'Čekání na ostatní hráče...';
+                 return `Kolo ${gameState.round}/${PHASE_DURATIONS.PHASE1_ROUNDS}: Vyberte si území`;
+            }
             
             const attackers = getAttackers(gameState.players);
             if (gameState.gamePhase === GamePhase.Phase2_Attacks && attackers.some(p => p.id === humanPlayer.id) && currentPlayer.id === humanPlayer.id) {
@@ -1510,6 +1652,9 @@ export default function App() {
         
         return (
             <div className="min-h-screen bg-gray-900 text-white flex flex-col">
+                 {gameState.gamePhase === GamePhase.GameOver && (
+                    <GameOverScreen gameState={gameState} onBackToLobby={handleBackToLobby} />
+                 )}
                 <header className="bg-gray-800/50 p-4 border-b border-cyan-500/30">
                     <div className="flex justify-between items-center">
                         <div>
@@ -1544,27 +1689,40 @@ export default function App() {
                         </div>
                     </aside>
                 </main>
-                {isHumanAnswering ? (
+                
+                {(isLoadingQuestion || (gameState.activeQuestion && isHumanAnswering)) && (
                      <QuestionModal activeQuestion={gameState.activeQuestion} onAnswer={handleAnswer} onTimeout={() => handleAnswer('timeout_wrong_answer')} loading={isLoadingQuestion} onUseHint={handleUseHint} humanPlayer={humanPlayer} />
-                ) : (
+                )}
+                
+                {gameState.activeQuestion && !isHumanAnswering && (
                      <SpectatorQuestionModal activeQuestion={gameState.activeQuestion} />
                 )}
-                <CategorySelectionModal 
-                    isOpen={!!attackTarget}
-                    availableCategories={CATEGORIES.filter(c => !currentPlayer?.usedAttackCategories.includes(c))}
-                    isBaseAttack={attackTarget?.isBaseAttack || false}
-                    onSelect={async (category) => {
-                        if(attackTarget?.isBaseAttack){
-                             const field = gameState.board.find(f => f.id === attackTarget.targetFieldId)!;
-                             await handleCategorySelect(field.category!);
-                        } else {
-                            await handleCategorySelect(category);
-                        }
-                    }}
-                    onClose={() => setAttackTarget(null)}
-                />
-                <AnswerFeedbackModal result={gameState.answerResult} humanPlayerId={humanPlayer.id} />
-                <EliminationFeedbackModal result={gameState.eliminationResult} />
+
+
+                {attackTarget && (
+                    <CategorySelectionModal 
+                        isOpen={true}
+                        availableCategories={CATEGORIES.filter(c => !currentPlayer?.usedAttackCategories.includes(c))}
+                        isBaseAttack={attackTarget.isBaseAttack}
+                        onSelect={async (category) => {
+                            if(attackTarget.isBaseAttack){
+                                 const field = gameState.board.find(f => f.id === attackTarget.targetFieldId)!;
+                                 await handleCategorySelect(field.category!);
+                            } else {
+                                await handleCategorySelect(category);
+                            }
+                        }}
+                        onClose={() => setAttackTarget(null)}
+                    />
+                )}
+
+                {gameState.answerResult && gameState.answerResult.playerId === humanPlayer.id && (
+                     <AnswerFeedbackModal result={gameState.answerResult} />
+                )}
+                
+                {gameState.eliminationResult && (
+                    <EliminationFeedbackModal result={gameState.eliminationResult} />
+                )}
             </div>
         );
       default:

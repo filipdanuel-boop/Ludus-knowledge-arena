@@ -1,4 +1,3 @@
-
 import { Category } from './types';
 
 export const CATEGORIES = Object.values(Category);
@@ -19,21 +18,12 @@ export const PLAYER_COLOR_HEX: { [key: string]: string } = {
   yellow: '#eab308',
 };
 
-// Map config now defines width/height for a compact rectangular hex grid.
-// Total neutral fields = playerCount * PHASE_DURATIONS.PHASE1_ROUNDS
-// Total fields = playerCount (bases) + neutral fields
-// We find width/height that roughly fits this total.
-export const MAP_CONFIG = {
-  2: { width: 4, height: 3 }, // 2 bases + 6 neutral = 8 total. 4x3=12, close enough.
-  4: { width: 5, height: 4 }, // 4 bases + 12 neutral = 16 total. 5x4=20.
-};
-
-
 export const INITIAL_COINS = 1000;
 export const WIN_COINS_PER_PLAYER = 50;
 export const AD_REWARD_COINS = 150;
 export const SURRENDER_COIN_PENALTY = 100;
 export const ELIMINATION_COIN_BONUS = 100;
+export const EMAIL_VERIFICATION_BONUS = 500;
 
 
 export const BASE_HP = 3;
