@@ -4,6 +4,7 @@ import { questionBank } from './questionBank';
 import { normalizeAnswer } from '../utils';
 import { LANGUAGES } from "../constants";
 
+// FIX: Updated comment to refer to API_KEY instead of VITE_API_KEY.
 // DŮLEŽITÉ: Pro nasazení na Vercel musíte nastavit proměnnou prostředí s názvem 'API_KEY'.
 // Jděte do nastavení vašeho projektu -> Settings -> Environment Variables a přidejte ji.
 // FIX: Switched to process.env.API_KEY to align with coding guidelines and resolve TypeScript error.
@@ -13,6 +14,7 @@ let ai: GoogleGenAI | null = null;
 if (apiKey) {
     ai = new GoogleGenAI({ apiKey });
 } else {
+    // FIX: Updated warning message to refer to API_KEY.
     console.warn("API_KEY is not set. Gemini features will be disabled.");
 }
 
@@ -88,7 +90,11 @@ ${JSON.stringify(sourceObject, null, 2)}`;
             }
         });
         
-        const cleanedJson = response.text.trim();
+        const cleanedJson = (response.text ?? '').trim();
+        if (!cleanedJson) {
+             console.error("Chyba při překladu: odpověď od API je prázdná.");
+             return question;
+        }
         const translatedObject = JSON.parse(cleanedJson);
 
         const finalQuestion: Question = {
@@ -135,7 +141,7 @@ export const generateLobbyIntro = async (appName: string, appDescription: string
             contents: prompt,
             config: { temperature: 0.7 }
         });
-        return response.text.trim();
+        return (response.text ?? '').trim();
     } catch (error) {
         console.error("Chyba při generování úvodu do lobby z Gemini:", error);
         return defaultIntro;

@@ -250,7 +250,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
                      const category = gameState.board.find(f => f.id === targetFieldId)!.category!;
                      const tieBreakerQuestion = await generateOpenEndedQuestion(category, 'hard', gameState.questionHistory, langForTiebreaker);
                      setIsProcessingQuestion(false);
-                     dispatch({ type: 'RESOLVE_TURN', payload: { tieBreakerQuestion }});
+                     dispatch({ type: 'RESOLVE_TURN', payload: { tieBreakerQuestion: tieBreakerQuestion || undefined }});
                 } else {
                      dispatch({ type: 'RESOLVE_TURN' });
                 }
