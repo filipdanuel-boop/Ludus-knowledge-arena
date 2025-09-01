@@ -78,6 +78,8 @@ export interface GameState {
     actionType: 'ATTACK' | 'HEAL';
     playerAnswers: Record<string, string | null>;
     startTime: number; // Timestamp for countdown
+    // FIX: Add category to active question to track for stats.
+    category: Category;
   } | null;
   winners: Player[] | null;
   phase1Selections?: Record<string, number | null>;

@@ -1,47 +1,39 @@
+// FIX: Import 'Type' for using responseSchema.
 import { GoogleGenAI, Type } from "@google/genai";
-import type { Question, Language, Category, QuestionDifficulty } from '../types';
+import type { Question, Language, Category } from '../types';
 import { questionBank } from './questionBank';
 import { normalizeAnswer } from '../utils';
-import { LANGUAGES } from "../constants";
 
-// FIX: Updated comment to refer to API_KEY instead of VITE_API_KEY.
-// DŮLEŽITÉ: Pro nasazení na Vercel musíte nastavit proměnnou prostředí s názvem 'API_KEY'.
-// Jděte do nastavení vašeho projektu -> Settings -> Environment Variables a přidejte ji.
 // FIX: Switched to process.env.API_KEY to align with coding guidelines and resolve TypeScript error.
+// DŮLEŽITÉ: Pro nasazení na Vercel musíte nastavit proměnou prostředí s názvem 'API_KEY'.
+// Jděte do nastavení vašeho projektu -> Settings -> Environment Variables a přidejte ji.
 const apiKey = process.env.API_KEY;
 
-let ai: GoogleGenAI | null = null;
-if (apiKey) {
-    ai = new GoogleGenAI({ apiKey });
-} else {
-    // FIX: Updated warning message to refer to API_KEY.
+if (!apiKey) {
     console.warn("API_KEY is not set. Gemini features will be disabled.");
 }
+const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
-const getQuestionsFromBank = (category: Category, difficulty: QuestionDifficulty, type: 'multipleChoice' | 'openEnded'): Question[] => {
-    const categoryBank = questionBank[category];
-    if (!categoryBank) return [];
-    
-    const typeBank = categoryBank[type];
-    if(!typeBank) return [];
-
-    return typeBank[difficulty] || [];
-}
-
-const getQuestionFromBank = (category: Category, difficulty: QuestionDifficulty, history: string[]): Question | null => {
-    const allQuestions = getQuestionsFromBank(category, difficulty, 'multipleChoice');
+// FIX: Correctly flatten questions from different difficulties into one array.
+const getQuestionFromBank = (category: Category, history: string[]): Question | null => {
+    const categoryQuestions = questionBank[category]?.multipleChoice;
+    if (!categoryQuestions) return null;
+    const allQuestions = Object.values(categoryQuestions).flat();
     if (allQuestions.length === 0) return null;
 
     const availableQuestions = allQuestions.filter(q => !history.includes(q.question));
     if (availableQuestions.length > 0) {
         return availableQuestions[Math.floor(Math.random() * availableQuestions.length)];
     }
-    // Fallback if all have been used
+    // Fallback to all questions if all have been used
     return allQuestions[Math.floor(Math.random() * allQuestions.length)];
 };
 
-const getOpenEndedQuestionFromBank = (category: Category, difficulty: QuestionDifficulty, history: string[]): Question | null => {
-    const allQuestions = getQuestionsFromBank(category, difficulty, 'openEnded');
+// FIX: Correctly flatten questions from different difficulties into one array.
+const getOpenEndedQuestionFromBank = (category: Category, history: string[]): Question | null => {
+    const categoryQuestions = questionBank[category]?.openEnded;
+    if (!categoryQuestions) return null;
+    const allQuestions = Object.values(categoryQuestions).flat();
     if (allQuestions.length === 0) return null;
     
     const availableQuestions = allQuestions.filter(q => !history.includes(q.question));
@@ -63,13 +55,13 @@ const translateQuestionPayload = async (question: Question, targetLang: Language
     }
 
     try {
-        const langName = LANGUAGES.find(l => l.code === targetLang)?.name || 'English';
-        const prompt = `Translate the values in the following JSON object from Czech to ${langName}.
+        const prompt = `First, translate the values in the following JSON object from Czech to English. Then, translate the English values to the language with code '${targetLang}'.
 Maintain the original JSON structure. Respond ONLY with the final translated JSON object, without any markdown formatting.
 
 Input:
 ${JSON.stringify(sourceObject, null, 2)}`;
 
+        // FIX: Use responseSchema for structured JSON output as recommended by guidelines.
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
@@ -90,20 +82,23 @@ ${JSON.stringify(sourceObject, null, 2)}`;
             }
         });
         
+        // FIX: The response text is now clean JSON due to responseSchema, so markdown cleaning is removed.
         const cleanedJson = (response.text ?? '').trim();
         if (!cleanedJson) {
-             console.error("Chyba při překladu: odpověď od API je prázdná.");
-             return question;
+            console.error("Chyba při překladu: API vrátilo prázdnou odpověď.");
+            return question; // Fallback to original question
         }
         const translatedObject = JSON.parse(cleanedJson);
 
+        // FIX: Add missing 'difficulty' property.
         const finalQuestion: Question = {
-            ...question,
             question: translatedObject.question || question.question,
             correctAnswer: translatedObject.correctAnswer || question.correctAnswer,
-            options: translatedObject.options || question.options
+            options: translatedObject.options || question.options,
+            difficulty: question.difficulty
         };
 
+        // Ensure correctAnswer matches one of the translated options exactly
         if (finalQuestion.options && Array.isArray(finalQuestion.options)) {
             const correctOption = finalQuestion.options.find(opt => normalizeAnswer(opt) === normalizeAnswer(finalQuestion.correctAnswer));
             finalQuestion.correctAnswer = correctOption || finalQuestion.correctAnswer;
@@ -113,35 +108,43 @@ ${JSON.stringify(sourceObject, null, 2)}`;
 
     } catch (error) {
         console.error("Chyba při překladu celé otázky:", error);
-        return question;
+        return question; // Fallback to original question
     }
 };
 
-export const generateQuestion = async (category: Category, difficulty: QuestionDifficulty, history: string[], targetLang: Language): Promise<Question | null> => {
-    const baseQuestion = getQuestionFromBank(category, difficulty, history);
+export const generateQuestion = async (category: Category, history: string[], targetLang: Language): Promise<Question | null> => {
+    const baseQuestion = getQuestionFromBank(category, history);
     if (!baseQuestion) return null;
     return translateQuestionPayload(baseQuestion, targetLang);
 };
 
-export const generateOpenEndedQuestion = async (category: Category, difficulty: QuestionDifficulty, history: string[], targetLang: Language): Promise<Question | null> => {
-    const baseQuestion = getOpenEndedQuestionFromBank(category, difficulty, history);
+export const generateOpenEndedQuestion = async (category: Category, history: string[], targetLang: Language): Promise<Question | null> => {
+    const baseQuestion = getOpenEndedQuestionFromBank(category, history);
     if (!baseQuestion) return null;
     return translateQuestionPayload(baseQuestion, targetLang);
 };
 
+// FIX: Added language parameter to generate a translated intro.
 export const generateLobbyIntro = async (appName: string, appDescription: string, userName: string, targetLang: Language): Promise<string | null> => {
-    const langName = LANGUAGES.find(l => l.code === targetLang)?.name || 'Czech';
+    const languageMap: Record<Language, string> = {
+        cs: 'Czech',
+        en: 'English',
+        de: 'German',
+        es: 'Spanish',
+    };
+    const languageName = languageMap[targetLang];
+    
     const defaultIntro = `Vítej v aréně, ${userName}! Dokaž své znalosti ve hře ${appName} a dobyj území. Hodně štěstí!`;
     if (!ai) return defaultIntro;
     
     try {
-        const prompt = `You are an AI host for a game called '${appName}'. The game's description is: '${appDescription}'. Write a short, energetic, and friendly greeting for a player named '${userName}' who is entering the lobby. Briefly mention that it's a battle of knowledge and territory conquest. Be concise (2-3 sentences max) and speak in ${langName}.`;
+        const prompt = `You are an AI game host for a game named '${appName}'. The game's description is: '${appDescription}'. Write a short, energetic, and friendly greeting for a player named '${userName}', welcoming them to the lobby. Briefly mention it's a battle of knowledge and territory conquest. Be concise (max 2-3 sentences) and speak in ${languageName}.`;
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
             config: { temperature: 0.7 }
         });
-        return (response.text ?? '').trim();
+        return (response.text ?? '').trim() || defaultIntro;
     } catch (error) {
         console.error("Chyba při generování úvodu do lobby z Gemini:", error);
         return defaultIntro;

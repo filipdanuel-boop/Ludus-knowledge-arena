@@ -71,10 +71,7 @@ export const translations: Record<Language, Translations> = {
     
     // FindingMatchScreen
     findingMatch: 'Vyhledávám zápas...',
-    searchingForOpponents: 'Hledám {0} {1}',
-    opponent_one: 'soupeře',
-    opponent_other: 'soupeřů',
-    elapsedTime: 'Uplynulý čas: {0}s',
+    playersFoundOf: 'Nalezeno hráčů: {0} / {1}',
 
     // RulesScreen
     rulesTitle: 'Pravidla Hry',
@@ -206,10 +203,7 @@ export const translations: Record<Language, Translations> = {
 
     // FindingMatchScreen
     findingMatch: 'Finding Match...',
-    searchingForOpponents: 'Searching for {0} {1}',
-    opponent_one: 'opponent',
-    opponent_other: 'opponents',
-    elapsedTime: 'Time elapsed: {0}s',
+    playersFoundOf: 'Players Found: {0} / {1}',
 
     // RulesScreen
     rulesTitle: 'Game Rules',
@@ -341,10 +335,7 @@ export const translations: Record<Language, Translations> = {
     
     // FindingMatchScreen
     findingMatch: 'Suche Spiel...',
-    searchingForOpponents: 'Suche nach {0} {1}',
-    opponent_one: 'Gegner',
-    opponent_other: 'Gegnern',
-    elapsedTime: 'Verstrichene Zeit: {0}s',
+    playersFoundOf: 'Spieler gefunden: {0} / {1}',
 
     // RulesScreen
     rulesTitle: 'Spielregeln',
@@ -476,10 +467,7 @@ export const translations: Record<Language, Translations> = {
     
     // FindingMatchScreen
     findingMatch: 'Buscando partida...',
-    searchingForOpponents: 'Buscando {0} {1}',
-    opponent_one: 'oponente',
-    opponent_other: 'oponentes',
-    elapsedTime: 'Tiempo transcurrido: {0}s',
+    playersFoundOf: 'Jugadores encontrados: {0} / {1}',
     
     // RulesScreen
     rulesTitle: 'Reglas del Juego',

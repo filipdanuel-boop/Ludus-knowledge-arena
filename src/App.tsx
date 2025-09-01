@@ -2,7 +2,6 @@ import * as React from 'react';
 import { Analytics } from '@vercel/analytics/react';
 import { User, Theme, GamePhase, Language, QuestionDifficulty } from './types';
 import { gameReducer } from './services/gameLogic';
-import appMetadata from './metadata.json';
 import { themes } from './themes';
 import * as userService from './services/userService';
 import { AD_REWARD_COINS } from './constants';
@@ -27,6 +26,12 @@ import { Spinner } from './components/ui/Spinner';
 
 type Screen = 'AUTH' | 'LOBBY' | 'ONLINE_LOBBY' | 'FINDING_MATCH' | 'GAME_SETUP' | 'RULES' | 'GAME' | 'PROFILE';
 
+// FIX: Hardcode metadata to resolve persistent module loading error
+const appMetadata = {
+  "name": "LUDUS: Knowledge Arena",
+  "description": "A strategic online trivia game where players conquer territories by answering questions. Compete in various modes, climb the ranks, and prove your knowledge in sports, culture, science, and more.",
+  "requestFramePermissions": []
+};
 
 const AppContent = () => {
   const { language, setLanguage } = useTranslation();

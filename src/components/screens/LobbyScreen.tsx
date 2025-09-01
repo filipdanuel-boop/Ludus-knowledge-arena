@@ -27,6 +27,7 @@ export const LobbyScreen: React.FC<{
     React.useEffect(() => {
         const userName = user.email.split('@')[0];
         if (appMetadata) {
+            // FIX: Pass language to generateLobbyIntro to get a translated greeting.
             generateLobbyIntro(appMetadata.name, appMetadata.description, userName, language)
                 .then(text => setIntroText(text || t('defaultWelcome', userName, appMetadata.name)))
                 .catch(() => setIntroText(t('defaultWelcome', userName, appMetadata.name)));

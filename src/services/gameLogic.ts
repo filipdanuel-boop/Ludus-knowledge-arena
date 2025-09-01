@@ -1,14 +1,17 @@
 import { GameState, GameAction, Player, Field, GamePhase, FieldType, Category, User, Question, UserStats, QuestionDifficulty } from '../types';
-import { CATEGORIES, PLAYER_COLORS, BASE_HP, FIELD_HP, BOT_NAMES, POINTS, PHASE_DURATIONS, ELIMINATION_COIN_BONUS, XP_PER_CORRECT_ANSWER, XP_FOR_WIN } from '../constants';
+import { CATEGORIES, PLAYER_COLORS, BASE_HP, FIELD_HP, BOT_NAMES, POINTS, PHASE_DURATIONS, ELIMINATION_COIN_BONUS, XP_PER_CORRECT_ANSWER, XP_FOR_WIN, BOT_SUCCESS_RATES } from '../constants';
 import { normalizeAnswer } from '../utils';
 
 
 export const createInitialGameState = (playerCount: number, user: User, isOnlineMode: boolean = false, botDifficulty?: QuestionDifficulty): GameState => {
+    const userName = user.email.split('@')[0];
+    const shuffledBotNames = [...BOT_NAMES].sort(() => 0.5 - Math.random());
+
     const players: Player[] = Array.from({ length: playerCount }, (_, i) => {
         const isBot = i !== 0;
         return {
             id: `player-${i+1}`,
-            name: isBot ? (isOnlineMode ? BOT_NAMES[Math.floor(Math.random()*BOT_NAMES.length)] : `Bot ${i}`) : 'Vy',
+            name: isBot ? (isOnlineMode ? shuffledBotNames.pop()! : `Bot ${i}`) : userName,
             color: PLAYER_COLORS[i % PLAYER_COLORS.length],
             score: 0,
             coins: i === 0 ? user.luduCoins : 1000,
@@ -345,7 +348,7 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
 
             // Update stats only for the human player
             if (player && !player.isBot) {
-                const newMatchStats = { ...state.matchStats };
+                const newMatchStats = JSON.parse(JSON.stringify(state.matchStats));
                 newMatchStats[playerId].total++;
                 newMatchStats[playerId].categories[category].total++;
                 if (isCorrect) {
@@ -398,7 +401,7 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
                 const botPlayer = newState.players.find((p: Player) => p.id === botId)!;
                 const botFieldIndex = newState.board.findIndex((f: Field) => f.id === botFieldId);
                 if (botFieldIndex !== -1 && newState.board[botFieldIndex].type === FieldType.Neutral && !newState.board[botFieldIndex].ownerId) {
-                     if (Math.random() < 0.7) {
+                     if (Math.random() < BOT_SUCCESS_RATES[newState.botDifficulty]) {
                         newState.board[botFieldIndex].ownerId = botId;
                         botPlayer.score += POINTS.PHASE1_CLAIM;
                         newState.gameLog.push(`${botPlayer.name} odpověděl správně a zabral pole.`);
