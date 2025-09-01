@@ -92,37 +92,45 @@ export interface GameState {
       attackerName: string;
   } | null;
   questionHistory: string[]; // History of questions for the current match
-  matchStats: Record<string, { correct: number, total: number, xpEarned: number, categories: Record<Category, { correct: number, total: number}> }>;
+  // FIX: Added missing properties to GameState for match statistics and bot difficulty.
+  matchStats: Record<string, {
+      correct: number;
+      total: number;
+      xpEarned: number;
+      categories: Record<Category, { correct: number, total: number }>;
+  }>;
+  botDifficulty: QuestionDifficulty;
 }
 
+// FIX: Added UserStats interface for detailed player statistics.
 export interface UserStats {
-    totalCorrect: number;
-    totalAnswered: number;
-    answeredQuestions: string[];
-    categoryStats: Record<Category, {
-        totalCorrect: number;
-        totalAnswered: number;
-    }>;
+  totalCorrect: number;
+  totalAnswered: number;
+  answeredQuestions: string[];
+  categoryStats: Record<Category, { totalCorrect: number, totalAnswered: number }>;
 }
 
 export interface User {
   email: string;
   luduCoins: number;
   language: Language;
+  // FIX: Added properties for XP, stats, and login streaks to the User type.
   xp: number;
   stats: UserStats;
-  lastLoginDate: string; // YYYY-MM-DD
+  lastLoginDate: string;
   loginStreak: number;
 }
 
 
 // --- Game Reducer Actions ---
 export type GameAction =
-  | { type: 'INITIALIZE_GAME'; payload: { playerCount: number; user: User, isOnlineMode?: boolean } }
+  // FIX: Updated INITIALIZE_GAME payload to accept optional botDifficulty.
+  | { type: 'INITIALIZE_GAME'; payload: { playerCount: number; user: User, isOnlineMode?: boolean, botDifficulty?: QuestionDifficulty } }
   | { type: 'SET_PHASE1_SELECTION'; payload: { playerId: string; fieldId: number } }
   | { type: 'SET_QUESTION'; payload: GameState['activeQuestion'] }
   | { type: 'CLEAR_QUESTION' }
-  | { type: 'SUBMIT_ANSWER'; payload: { playerId: string; answer: string, category: Category } }
+  // FIX: Updated SUBMIT_ANSWER payload to include the question category for stats tracking.
+  | { type: 'SUBMIT_ANSWER'; payload: { playerId: string; answer: string; category: Category } }
   | { type: 'RESOLVE_PHASE1_ROUND'; payload: { humanActionResult: 'win' | 'loss', fieldId: number } }
   | { type: 'RESOLVE_TURN'; payload?: { tieBreakerQuestion?: Question } }
   | { type: 'SET_ANSWER_FEEDBACK'; payload: GameState['answerResult'] }

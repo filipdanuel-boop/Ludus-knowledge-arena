@@ -1,8 +1,10 @@
 import * as React from 'react';
 import { LuduCoin } from './LuduCoin';
 import { themes } from '../../themes';
+import { useTranslation } from '../../i18n/LanguageContext';
 
 export const RewardNotification: React.FC<{ amount: number; onDismiss: () => void; }> = ({ amount, onDismiss }) => {
+    const { t } = useTranslation();
     const [visible, setVisible] = React.useState(true);
 
     React.useEffect(() => {
@@ -21,8 +23,8 @@ export const RewardNotification: React.FC<{ amount: number; onDismiss: () => voi
         >
             <LuduCoin themeConfig={themeConfig} className="w-8 h-8"/>
             <div>
-                <p className={`${themeConfig.accentTextLight} font-bold`}>Denní odměna!</p>
-                <p className="text-white">Získal jsi +{amount} mincí!</p>
+                <p className={`${themeConfig.accentTextLight} font-bold`}>{t('dailyReward')}</p>
+                <p className="text-white">{t('coinsReceived', amount)}</p>
             </div>
         </div>
     );

@@ -1,9 +1,9 @@
-
 import * as React from 'react';
 import { Theme } from '../../types';
 import { themes } from '../../themes';
 import { Modal } from '../ui/Modal';
 import { NeonButton } from '../ui/NeonButton';
+import { useTranslation } from '../../i18n/LanguageContext';
 
 interface ThemeSelectionModalProps {
     isOpen: boolean;
@@ -13,10 +13,12 @@ interface ThemeSelectionModalProps {
     themes: Record<Theme, any>;
 }
 
-export const ThemeSelectionModal: React.FC<ThemeSelectionModalProps> = ({ isOpen, onClose, currentTheme, onSelectTheme, themes }) => (
+export const ThemeSelectionModal: React.FC<ThemeSelectionModalProps> = ({ isOpen, onClose, currentTheme, onSelectTheme, themes }) => {
+    const { t } = useTranslation();
+    return (
     <Modal isOpen={isOpen} themeConfig={themes[currentTheme]}>
         <div className="text-center">
-            <h2 className={`text-3xl font-bold ${themes[currentTheme].accentTextLight} mb-6`}>Zvolte Vizuální Téma</h2>
+            <h2 className={`text-3xl font-bold ${themes[currentTheme].accentTextLight} mb-6`}>{t('chooseTheme')}</h2>
             <div className="grid grid-cols-2 gap-4">
                 {(Object.keys(themes) as Theme[]).map(themeKey => {
                     const loopThemeConfig = themes[themeKey];
@@ -32,8 +34,9 @@ export const ThemeSelectionModal: React.FC<ThemeSelectionModalProps> = ({ isOpen
                 })}
             </div>
             <div className="mt-8">
-                <NeonButton onClick={onClose} variant="secondary" themeConfig={themes[currentTheme]}>Zavřít</NeonButton>
+                <NeonButton onClick={onClose} variant="secondary" themeConfig={themes[currentTheme]}>{t('close')}</NeonButton>
             </div>
         </div>
     </Modal>
 );
+}

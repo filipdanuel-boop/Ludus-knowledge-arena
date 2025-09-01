@@ -1,4 +1,4 @@
-import { User, Category } from '../types';
+import { User, Category, Language } from '../types';
 import { INITIAL_COINS } from '../constants';
 
 const USERS_DB_KEY = 'ludus_users';
@@ -28,12 +28,12 @@ const getInitialStats = () => {
     };
 };
 
-export const registerUser = (email: string, password: string): { success: boolean, message: string, user?: User } => {
+export const registerUser = (email: string, password: string, language: Language): { success: boolean, message: string, user?: User } => {
     const users = getAllUsers();
     const lowerEmail = email.toLowerCase();
     
     if (users[lowerEmail]) {
-        return { success: false, message: "Uživatel s tímto emailem již existuje." };
+        return { success: false, message: "errorUserExists" };
     }
 
     const today = new Date().toISOString().split('T')[0];
@@ -41,7 +41,7 @@ export const registerUser = (email: string, password: string): { success: boolea
     const newUser: User = {
         email: lowerEmail,
         luduCoins: INITIAL_COINS,
-        language: 'cs',
+        language: language,
         xp: 0,
         stats: getInitialStats(),
         lastLoginDate: today,
@@ -60,10 +60,10 @@ export const loginUser = (email: string, password: string): { success: boolean, 
     const userData = users[lowerEmail];
 
     if (!userData) {
-        return { success: false, message: "Uživatel s tímto emailem neexistuje." };
+        return { success: false, message: "errorUserNotFound" };
     }
     if (userData.password !== password) { // In a real app, compare hashed passwords
-        return { success: false, message: "Nesprávné heslo." };
+        return { success: false, message: "errorIncorrectPassword" };
     }
 
     // Omit password from the user object returned to the app

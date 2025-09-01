@@ -2,6 +2,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import type { Question, Language, Category, QuestionDifficulty } from '../types';
 import { questionBank } from './questionBank';
 import { normalizeAnswer } from '../utils';
+import { LANGUAGES } from "../constants";
 
 // DŮLEŽITÉ: Pro nasazení na Vercel musíte nastavit proměnnou prostředí s názvem 'API_KEY'.
 // Jděte do nastavení vašeho projektu -> Settings -> Environment Variables a přidejte ji.
@@ -60,7 +61,8 @@ const translateQuestionPayload = async (question: Question, targetLang: Language
     }
 
     try {
-        const prompt = `First, translate the values in the following JSON object from Czech to English. Then, translate the English values to the language with code '${targetLang}'.
+        const langName = LANGUAGES.find(l => l.code === targetLang)?.name || 'English';
+        const prompt = `Translate the values in the following JSON object from Czech to ${langName}.
 Maintain the original JSON structure. Respond ONLY with the final translated JSON object, without any markdown formatting.
 
 Input:
@@ -121,12 +123,13 @@ export const generateOpenEndedQuestion = async (category: Category, difficulty: 
     return translateQuestionPayload(baseQuestion, targetLang);
 };
 
-export const generateLobbyIntro = async (appName: string, appDescription: string, userName: string): Promise<string | null> => {
+export const generateLobbyIntro = async (appName: string, appDescription: string, userName: string, targetLang: Language): Promise<string | null> => {
+    const langName = LANGUAGES.find(l => l.code === targetLang)?.name || 'Czech';
     const defaultIntro = `Vítej v aréně, ${userName}! Dokaž své znalosti ve hře ${appName} a dobyj území. Hodně štěstí!`;
     if (!ai) return defaultIntro;
     
     try {
-        const prompt = `Jsi AI hostitel hry s názvem '${appName}'. Popis hry je: '${appDescription}'. Napiš krátký, energický a přátelský pozdrav pro hráče jménem '${userName}', který ho vítá v lobby. Zmiň se stručně o tom, že se jedná o souboj vědomostí a dobývání území. Buď stručný (maximálně 2-3 věty) a mluv česky.`;
+        const prompt = `You are an AI host for a game called '${appName}'. The game's description is: '${appDescription}'. Write a short, energetic, and friendly greeting for a player named '${userName}' who is entering the lobby. Briefly mention that it's a battle of knowledge and territory conquest. Be concise (2-3 sentences max) and speak in ${langName}.`;
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,

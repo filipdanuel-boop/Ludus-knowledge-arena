@@ -1,11 +1,12 @@
 import * as React from 'react';
 import { Analytics } from '@vercel/analytics/react';
-import { User, Theme, GamePhase } from './types';
+import { User, Theme, GamePhase, Language, QuestionDifficulty } from './types';
 import { gameReducer } from './services/gameLogic';
 import appMetadata from './metadata.json';
 import { themes } from './themes';
 import * as userService from './services/userService';
 import { AD_REWARD_COINS } from './constants';
+import { LanguageProvider, useTranslation } from './i18n/LanguageContext';
 
 // Import screen components
 import { AuthScreen } from './components/screens/AuthScreen';
@@ -16,6 +17,8 @@ import { GameSetupScreen } from './components/screens/GameSetupScreen';
 import { RulesScreen } from './components/screens/RulesScreen';
 import { GameScreen } from './components/screens/GameScreen';
 import { ProfileScreen } from './components/screens/ProfileScreen';
+import { LanguageSelectionScreen } from './components/screens/LanguageSelectionScreen';
+
 
 // Import UI components
 import { AdRewardModal } from './components/game/AdRewardModal';
@@ -24,7 +27,11 @@ import { Spinner } from './components/ui/Spinner';
 
 type Screen = 'AUTH' | 'LOBBY' | 'ONLINE_LOBBY' | 'FINDING_MATCH' | 'GAME_SETUP' | 'RULES' | 'GAME' | 'PROFILE';
 
-export default function App() {
+
+const AppContent = () => {
+  const { language, setLanguage } = useTranslation();
+  const [isLanguageSet, setIsLanguageSet] = React.useState(!!localStorage.getItem('ludus_language'));
+
   const [screen, setScreen] = React.useState<Screen>('AUTH');
   const [user, setUser] = React.useState<User | null>(null);
   const [isAdModalOpen, setIsAdModalOpen] = React.useState(false);
@@ -36,25 +43,43 @@ export default function App() {
 
   const themeConfig = themes[theme];
   
+  const handleLanguageSelect = (lang: Language) => {
+    setLanguage(lang);
+    setIsLanguageSet(true);
+  };
+
   React.useEffect(() => {
     // Auto-login attempt
     const loggedInUser = userService.getLoggedInUser();
     if (loggedInUser) {
+        // Sync global language with user's saved language
+        if(loggedInUser.language !== language) {
+            setLanguage(loggedInUser.language);
+        }
       setUser(loggedInUser);
       setScreen('LOBBY');
     }
   }, []);
 
   React.useEffect(() => {
+      if (user && user.language !== language) {
+          const updatedUser = { ...user, language };
+          setUser(updatedUser);
+          userService.saveUserData(updatedUser);
+      }
+  }, [language, user]);
+
+  React.useEffect(() => {
     localStorage.setItem('ludus_theme', theme);
-    // Safer way to handle background classes
     Object.values(themes).forEach(t => document.body.classList.remove(t.background));
     document.body.classList.add(themeConfig.background);
   }, [theme, themeConfig]);
 
   const handleLogin = (loggedInUser: User) => {
-    setUser(loggedInUser);
-    userService.saveLoggedInUser(loggedInUser.email);
+    const userWithCurrentLang = { ...loggedInUser, language };
+    setUser(userWithCurrentLang);
+    userService.saveUserData(userWithCurrentLang);
+    userService.saveLoggedInUser(userWithCurrentLang.email);
     setScreen('LOBBY');
   };
   
@@ -64,9 +89,9 @@ export default function App() {
     setScreen('AUTH');
   };
 
-  const handleStartGame = (playerCount: number) => {
+  const handleStartGame = (playerCount: number, botDifficulty: QuestionDifficulty) => {
     if (user) {
-        dispatch({ type: 'INITIALIZE_GAME', payload: { playerCount, user } });
+        dispatch({ type: 'INITIALIZE_GAME', payload: { playerCount, user, botDifficulty } });
         setScreen('GAME');
     }
   };
@@ -77,12 +102,9 @@ export default function App() {
   };
 
   const handleBackToLobby = () => {
-      if (gameState?.players) {
-        const humanPlayer = gameState.players.find(p => !p.isBot);
-        if (humanPlayer && user) {
-            const updatedUser = userService.loadUserData(user.email);
-            if(updatedUser) setUser(updatedUser);
-        }
+      if (gameState?.players && user) {
+        const updatedUser = userService.loadUserData(user.email);
+        if(updatedUser) setUser(updatedUser);
       }
       dispatch({ type: 'SET_STATE', payload: { gamePhase: GamePhase.Setup }});
       setScreen('LOBBY');
@@ -139,6 +161,10 @@ export default function App() {
     }
   };
 
+  if (!isLanguageSet) {
+    return <LanguageSelectionScreen onSelect={handleLanguageSelect} />;
+  }
+
   return (
     <div>
         <Analytics />
@@ -162,4 +188,12 @@ export default function App() {
         }} themeConfig={themeConfig} />}
     </div>
   );
+}
+
+export default function App() {
+    return (
+        <LanguageProvider>
+            <AppContent />
+        </LanguageProvider>
+    )
 }

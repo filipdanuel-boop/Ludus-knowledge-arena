@@ -1,4 +1,4 @@
-import { Category } from './types';
+import { Category, QuestionDifficulty } from './types';
 
 export const CATEGORIES = Object.values(Category);
 
@@ -63,6 +63,12 @@ export const BOT_NAMES = [
     "ShadowStriker", "QuantumLeap", "Vortex", "Nebula", "CyberJaw", 
     "Pulse", "Ghost", "Echo", "Titan", "Viper", "Omega"
 ];
+
+export const BOT_SUCCESS_RATES: Record<QuestionDifficulty, number> = {
+    easy: 0.25,
+    medium: 0.50,
+    hard: 0.75,
+};
 
 // XP System
 export const XP_PER_CORRECT_ANSWER = 15;

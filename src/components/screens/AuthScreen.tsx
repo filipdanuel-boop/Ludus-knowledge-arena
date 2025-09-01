@@ -3,8 +3,10 @@ import { User, Theme } from '../../types';
 import { themes } from '../../themes';
 import { NeonButton } from '../ui/NeonButton';
 import * as userService from '../../services/userService';
+import { useTranslation } from '../../i18n/LanguageContext';
 
 export const AuthScreen: React.FC<{ onLogin: (user: User) => void; themeConfig: typeof themes[Theme] }> = ({ onLogin, themeConfig }) => {
+  const { t, language } = useTranslation();
   const [authMode, setAuthMode] = React.useState<'login' | 'register'>('login');
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
@@ -16,11 +18,11 @@ export const AuthScreen: React.FC<{ onLogin: (user: User) => void; themeConfig: 
     setError(null);
 
     if (!email || !password) {
-        setError("Email i heslo jsou povinné.");
+        setError(t('errorEmailPasswordRequired'));
         return;
     }
     if (!/\S+@\S+\.\S+/.test(email)) {
-        setError("Neplatný formát emailu.");
+        setError(t('errorInvalidEmail'));
         return;
     }
     
@@ -29,23 +31,23 @@ export const AuthScreen: React.FC<{ onLogin: (user: User) => void; themeConfig: 
         if (result.success && result.user) {
             onLogin(result.user);
         } else {
-            setError(result.message);
+            setError(t(result.message));
         }
     } else { // Register mode
         if (password.length < 6) {
-            setError("Heslo musí mít alespoň 6 znaků.");
+            setError(t('errorPasswordLength'));
             return;
         }
         if (password !== confirmPassword) {
-            setError("Hesla se neshodují.");
+            setError(t('errorPasswordsMismatch'));
             return;
         }
         
-        const result = userService.registerUser(email, password);
+        const result = userService.registerUser(email, password, language);
         if (result.success && result.user) {
             onLogin(result.user);
         } else {
-            setError(result.message);
+            setError(t(result.message));
         }
     }
   };
@@ -54,13 +56,13 @@ export const AuthScreen: React.FC<{ onLogin: (user: User) => void; themeConfig: 
     <div className="min-h-screen flex flex-col items-center justify-center p-4">
       <div className="text-center mb-10">
         <h1 className={`text-7xl font-bold ${themeConfig.accentText} tracking-widest ${themeConfig.pulseAnimation}`}>LUDUS</h1>
-        <p className="text-gray-400 text-xl mt-2">Aréna Vědomostí</p>
+        <p className="text-gray-400 text-xl mt-2">{t('arenaOfKnowledge')}</p>
       </div>
       <div className={`w-full max-w-md bg-gray-800 p-8 rounded-lg border ${themeConfig.accentBorder} shadow-2xl ${themeConfig.accentShadow}`}>
-        <h2 className={`text-3xl font-bold text-center mb-6 ${themeConfig.accentTextLight}`}>{authMode === 'login' ? 'Přihlášení' : 'Registrace'}</h2>
+        <h2 className={`text-3xl font-bold text-center mb-6 ${themeConfig.accentTextLight}`}>{authMode === 'login' ? t('loginTitle') : t('registerTitle')}</h2>
         <form onSubmit={handleSubmit} noValidate>
           <div className="mb-4">
-            <label className="block text-gray-400 mb-2" htmlFor="email">Email</label>
+            <label className="block text-gray-400 mb-2" htmlFor="email">{t('emailLabel')}</label>
             <input 
               type="email" 
               id="email" 
@@ -70,7 +72,7 @@ export const AuthScreen: React.FC<{ onLogin: (user: User) => void; themeConfig: 
             />
           </div>
           <div className="mb-6">
-            <label className="block text-gray-400 mb-2" htmlFor="password">Heslo</label>
+            <label className="block text-gray-400 mb-2" htmlFor="password">{t('passwordLabel')}</label>
             <input 
               type="password" 
               id="password" 
@@ -81,7 +83,7 @@ export const AuthScreen: React.FC<{ onLogin: (user: User) => void; themeConfig: 
           </div>
           {authMode === 'register' && (
             <div className="mb-6">
-              <label className="block text-gray-400 mb-2" htmlFor="confirmPassword">Potvrdit Heslo</label>
+              <label className="block text-gray-400 mb-2" htmlFor="confirmPassword">{t('confirmPasswordLabel')}</label>
               <input 
                 type="password" 
                 id="confirmPassword" 
@@ -92,14 +94,14 @@ export const AuthScreen: React.FC<{ onLogin: (user: User) => void; themeConfig: 
             </div>
           )}
           {error && <p className="text-red-500 text-center mb-4 animate-shake">{error}</p>}
-          <NeonButton type="submit" className="w-full" themeConfig={themeConfig}>{authMode === 'login' ? 'Vstoupit do Arény' : 'Vytvořit Účet'}</NeonButton>
+          <NeonButton type="submit" className="w-full" themeConfig={themeConfig}>{authMode === 'login' ? t('enterArenaButton') : t('createAccountButton')}</NeonButton>
         </form>
         <p className="text-center mt-6 text-gray-500">
           <button onClick={() => {
             setAuthMode(authMode === 'login' ? 'register' : 'login');
             setError(null);
           }} className={`${themeConfig.accentText} hover:underline`}>
-            {authMode === 'login' ? "Potřebujete účet? Zaregistrujte se" : "Už máte účet? Přihlaste se"}
+            {authMode === 'login' ? t('needAccountPrompt') : t('haveAccountPrompt')}
           </button>
         </p>
       </div>

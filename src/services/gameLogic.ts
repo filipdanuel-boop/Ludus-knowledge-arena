@@ -1,9 +1,9 @@
-import { GameState, GameAction, Player, Field, GamePhase, FieldType, Category, User, Question, UserStats } from '../types';
+import { GameState, GameAction, Player, Field, GamePhase, FieldType, Category, User, Question, UserStats, QuestionDifficulty } from '../types';
 import { CATEGORIES, PLAYER_COLORS, BASE_HP, FIELD_HP, BOT_NAMES, POINTS, PHASE_DURATIONS, ELIMINATION_COIN_BONUS, XP_PER_CORRECT_ANSWER, XP_FOR_WIN } from '../constants';
 import { normalizeAnswer } from '../utils';
 
 
-export const createInitialGameState = (playerCount: number, user: User, isOnlineMode: boolean = false): GameState => {
+export const createInitialGameState = (playerCount: number, user: User, isOnlineMode: boolean = false, botDifficulty?: QuestionDifficulty): GameState => {
     const players: Player[] = Array.from({ length: playerCount }, (_, i) => {
         const isBot = i !== 0;
         return {
@@ -62,7 +62,6 @@ export const createInitialGameState = (playerCount: number, user: User, isOnline
     // Initialize stats for the match
     const matchStats = players.reduce((acc, player) => {
         if (!player.isBot) {
-            // FIX: Initialize xpEarned property for the human player's match statistics.
             acc[player.id] = { correct: 0, total: 0, xpEarned: 0, categories: Object.values(Category).reduce((catAcc, cat) => {
                 catAcc[cat] = { correct: 0, total: 0 };
                 return catAcc;
@@ -86,6 +85,7 @@ export const createInitialGameState = (playerCount: number, user: User, isOnline
         eliminationResult: null,
         questionHistory: [], // Start fresh for each game
         matchStats,
+        botDifficulty: botDifficulty || 'medium',
     };
 };
 
@@ -315,7 +315,7 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
 
     switch (action.type) {
         case 'INITIALIZE_GAME':
-            return createInitialGameState(action.payload.playerCount, action.payload.user, action.payload.isOnlineMode);
+            return createInitialGameState(action.payload.playerCount, action.payload.user, action.payload.isOnlineMode, action.payload.botDifficulty);
 
         case 'SET_PHASE1_SELECTION':
             if (!state) return null;

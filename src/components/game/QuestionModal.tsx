@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { GameState, Player, Theme } from '../../types';
 import { themes } from '../../themes';
@@ -8,6 +7,7 @@ import { NeonButton } from '../ui/NeonButton';
 import { LuduCoin } from '../ui/LuduCoin';
 import { TimerUI } from './TimerUI';
 import { HINT_COSTS } from '../../constants';
+import { useTranslation } from '../../i18n/LanguageContext';
 
 const ANSWER_TIME_LIMIT = 15;
 
@@ -20,6 +20,7 @@ export const QuestionModal: React.FC<{
     humanPlayer: Player;
     themeConfig: typeof themes[Theme];
 }> = ({ activeQuestion, onAnswer, onUseHint, onTimeout, loading, humanPlayer, themeConfig }) => {
+    const { t } = useTranslation();
     const [writtenAnswer, setWrittenAnswer] = React.useState("");
     
     React.useEffect(() => {
@@ -44,13 +45,13 @@ export const QuestionModal: React.FC<{
             {loading ? (
                 <div className="flex flex-col items-center justify-center min-h-[300px]">
                     <Spinner themeConfig={themeConfig} />
-                    <p className={`mt-4 text-xl ${themeConfig.accentTextLight}`}>Zpracovávám otázku...</p>
+                    <p className={`mt-4 text-xl ${themeConfig.accentTextLight}`}>{t('loading')}</p>
                 </div>
             ) : activeQuestion && (
                 <div>
                     <div className="flex justify-between items-start mb-4">
                         <div>
-                            <p className={`${themeConfig.accentText} text-sm mb-2`}>{isTieBreaker ? 'ROZSTŘEL!' : (isHealing ? 'Opravujete Základnu' : 'Otázka')}</p>
+                            <p className={`${themeConfig.accentText} text-sm mb-2`}>{isTieBreaker ? t('tiebreaker') : (isHealing ? t('repairingBase') : t('question'))}</p>
                             <h2 className="text-2xl font-bold">{activeQuestion.question.question}</h2>
                         </div>
                         {isAnswering && <TimerUI startTime={activeQuestion.startTime} timeLimit={ANSWER_TIME_LIMIT} onTimeout={onTimeout} themeConfig={themeConfig} />}
@@ -78,10 +79,10 @@ export const QuestionModal: React.FC<{
                                 disabled={!isAnswering}
                                 autoFocus
                                 className={`w-full p-3 bg-gray-700 rounded border border-gray-600 text-white text-lg focus:outline-none focus:ring-2 ${themeConfig.accentRing}`}
-                                placeholder="Napište odpověď..."
+                                placeholder={t('yourAnswer')}
                             />
                              <div className="text-right mt-4">
-                                <NeonButton type="submit" disabled={!isAnswering || !writtenAnswer.trim()} themeConfig={themeConfig}>Odeslat</NeonButton>
+                                <NeonButton type="submit" disabled={!isAnswering || !writtenAnswer.trim()} themeConfig={themeConfig}>{t('submit')}</NeonButton>
                              </div>
                         </form>
                     )}
@@ -91,10 +92,10 @@ export const QuestionModal: React.FC<{
                                 variant="secondary" 
                                 onClick={onUseHint}
                                 disabled={!canAffordHint}
-                                title={!canAffordHint ? "Nedostatek mincí" : ""}
+                                title={!canAffordHint ? t('insufficientCoins') : ""}
                                 themeConfig={themeConfig}
                             >
-                                Jistota ({HINT_COSTS.AUTO_ANSWER}) <LuduCoin className="w-5 h-5" themeConfig={themeConfig}/>
+                                {t('hint', HINT_COSTS.AUTO_ANSWER)} <LuduCoin className="w-5 h-5" themeConfig={themeConfig}/>
                             </NeonButton>
                         </div>
                     )}

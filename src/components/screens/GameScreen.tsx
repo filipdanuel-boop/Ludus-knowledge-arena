@@ -3,11 +3,12 @@ import { GameState, User, Theme, Player, Category, GamePhase, QuestionDifficulty
 import { themes } from '../../themes';
 import { GameAction } from '../../types';
 import { generateQuestion, generateOpenEndedQuestion } from '../../services/geminiService';
-// FIX: Added HINT_COSTS to imports to resolve reference errors.
-import { CATEGORIES, PHASE_DURATIONS, WIN_COINS_PER_PLAYER, XP_FOR_WIN, HINT_COSTS } from '../../constants';
+// FIX: Added HINT_COSTS and BOT_SUCCESS_RATES to imports to resolve reference errors.
+import { CATEGORIES, PHASE_DURATIONS, WIN_COINS_PER_PLAYER, XP_FOR_WIN, HINT_COSTS, BOT_SUCCESS_RATES } from '../../constants';
 import * as userService from '../../services/userService';
 import { decideBotAction, getAttackers } from '../../services/gameLogic';
 import { normalizeAnswer } from '../../utils';
+import { useTranslation } from '../../i18n/LanguageContext';
 
 // Import Game Components
 import { GameOverScreen } from '../game/GameOverScreen';
@@ -30,6 +31,7 @@ interface GameScreenProps {
 }
 
 export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, user, setUser, onBackToLobby, themeConfig }) => {
+    const { t } = useTranslation();
     const [isProcessingQuestion, setIsProcessingQuestion] = React.useState(false);
     const [attackTarget, setAttackTarget] = React.useState<{ targetFieldId: number; defenderId?: string; isBaseAttack: boolean; } | null>(null);
     const [gameTime, setGameTime] = React.useState(0);
@@ -179,14 +181,16 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
             startTime: Date.now(),
             actionType: action as 'ATTACK' | 'HEAL'
         }});
+        
+        const botSuccessRate = BOT_SUCCESS_RATES[gameState.botDifficulty];
 
-        dispatch({ type: 'SUBMIT_ANSWER', payload: { playerId: bot.id, answer: Math.random() < 0.7 ? question.correctAnswer : "wrong", category: category! } });
+        dispatch({ type: 'SUBMIT_ANSWER', payload: { playerId: bot.id, answer: Math.random() < botSuccessRate ? question.correctAnswer : "wrong", category: category! } });
 
         if (defender && !defender.isBot) {
             // Human will answer via UI
         } else {
             if (defender && defender.isBot) {
-                 dispatch({ type: 'SUBMIT_ANSWER', payload: { playerId: defender.id, answer: Math.random() < 0.6 ? question.correctAnswer : "wrong_2", category: category! } });
+                 dispatch({ type: 'SUBMIT_ANSWER', payload: { playerId: defender.id, answer: Math.random() < botSuccessRate ? question.correctAnswer : "wrong_2", category: category! } });
             }
             setTimeout(() => dispatch({ type: 'RESOLVE_TURN' }), 2000);
         }
@@ -279,6 +283,9 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
             const isWinner = gameState.winners?.some(w => w.id === humanPlayer.id) ?? false;
             
             let finalXp = user.xp + (matchStats.xpEarned || 0);
+             if (isWinner) {
+                finalXp += XP_FOR_WIN;
+            }
 
             const finalCoins = humanPlayer.coins + (isWinner ? (gameState.players.length - 1) * WIN_COINS_PER_PLAYER : 0);
 
@@ -311,20 +318,20 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
     const isHumanAnswering = gameState.activeQuestion?.playerAnswers.hasOwnProperty(humanPlayer.id);
 
     const getHeaderText = () => {
-        if (gameState.answerResult) return 'Vyhodnocuji...';
-        if (isProcessingQuestion) return 'Načítám...';
+        if (gameState.answerResult) return t('evaluating');
+        if (isProcessingQuestion) return t('loading');
         if (gameState.activeQuestion) {
-             if (isHumanAnswering && gameState.activeQuestion.playerAnswers[humanPlayer.id] === null) return 'Odpovězte na otázku!';
-             return 'Soupeř je na tahu...';
+             if (isHumanAnswering && gameState.activeQuestion.playerAnswers[humanPlayer.id] === null) return t('answerTheQuestion');
+             return t('opponentTurn');
         }
         if (gameState.gamePhase === GamePhase.Phase1_LandGrab) {
-             if (gameState.phase1Selections?.[humanPlayer.id]) return 'Čekání na ostatní hráče...';
-             return `Kolo ${gameState.round}/${PHASE_DURATIONS.PHASE1_ROUNDS}: Vyberte si území`;
+             if (gameState.phase1Selections?.[humanPlayer.id]) return t('waitingForPlayers');
+             return t('phase1SelectTerritory', gameState.round, PHASE_DURATIONS.PHASE1_ROUNDS);
         }
         if (gameState.gamePhase === GamePhase.Phase2_Attacks && getAttackers(gameState.players).some(p => p.id === humanPlayer.id) && currentPlayer.id === humanPlayer.id) {
-            return 'Jste na řadě s útokem!';
+            return t('yourTurnToAttack');
         }
-        return <>Na tahu: <span className={`font-bold text-${currentPlayer?.color}-400`}>{currentPlayer?.name}</span></>;
+        return <>{t('turnOf', '')}<span className={`font-bold text-${currentPlayer?.color}-400`}>{currentPlayer?.name}</span></>;
     };
     
     const formatTime = (ms: number) => {
@@ -342,8 +349,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
             <header className={`bg-gray-800/50 p-4 border-b ${themeConfig.accentBorder}`}>
                 <div className="flex justify-between items-center">
                     <div>
-                        <h1 className={`text-2xl font-bold ${themeConfig.accentText} capitalize`}>Fáze: {phaseName.toLowerCase()}</h1>
-                        <p className="text-gray-400">Kolo: {gameState.round}</p>
+                        <h1 className={`text-2xl font-bold ${themeConfig.accentText} capitalize`}>{t('phase')}: {phaseName.toLowerCase()}</h1>
+                        <p className="text-gray-400">{t('round')}: {gameState.round}</p>
                     </div>
                     <div className={`text-2xl font-mono ${themeConfig.accentTextLight}`}>{formatTime(gameTime)}</div>
                     <div className="text-right"><h2 className="text-xl">{getHeaderText()}</h2></div>
@@ -357,10 +364,10 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
                     />
                 </div>
                 <aside className={`md:w-1/3 lg:w-1/4 bg-gray-900/50 p-4 border-t md:border-t-0 md:border-l ${themeConfig.accentBorder} order-1 md:order-2 overflow-y-auto`}>
-                    <h2 className={`text-2xl font-bold ${themeConfig.accentTextLight} border-b border-gray-700 pb-2 mb-4`}>Hráči</h2>
+                    <h2 className={`text-2xl font-bold ${themeConfig.accentTextLight} border-b border-gray-700 pb-2 mb-4`}>{t('players')}</h2>
                     <PlayerStatusUI players={gameState.players} currentPlayerId={currentPlayer?.id} board={gameState.board} themeConfig={themeConfig} />
                     {gameState.gamePhase === GamePhase.Phase2_Attacks && <AttackOrderUI attackers={getAttackers(gameState.players)} currentPlayerId={currentPlayer?.id} themeConfig={themeConfig} />}
-                    <h2 className={`text-2xl font-bold ${themeConfig.accentTextLight} border-b border-gray-700 pb-2 mb-4 mt-6`}>Záznam Hry</h2>
+                    <h2 className={`text-2xl font-bold ${themeConfig.accentTextLight} border-b border-gray-700 pb-2 mb-4 mt-6`}>{t('gameLog')}</h2>
                     <div className="h-64 overflow-y-auto bg-gray-800 p-2 rounded-md">
                         {gameState.gameLog.slice().reverse().map((log, i) => <p key={i} className="text-sm text-gray-400 mb-1">{log}</p>)}
                     </div>
