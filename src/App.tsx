@@ -54,17 +54,19 @@ const AppContent = () => {
   };
 
   React.useEffect(() => {
-    // Auto-login attempt
-    const loggedInUser = userService.getLoggedInUser();
-    if (loggedInUser) {
-        // Sync global language with user's saved language
-        if(loggedInUser.language !== language) {
-            setLanguage(loggedInUser.language);
-        }
-      setUser(loggedInUser);
-      setScreen('LOBBY');
+    // FIX: Only attempt auto-login after the language has been set.
+    if (isLanguageSet) {
+      const loggedInUser = userService.getLoggedInUser();
+      if (loggedInUser) {
+          // Sync global language with user's saved language
+          if(loggedInUser.language !== language) {
+              setLanguage(loggedInUser.language);
+          }
+        setUser(loggedInUser);
+        setScreen('LOBBY');
+      }
     }
-  }, []);
+  }, [isLanguageSet, language, setLanguage]);
 
   React.useEffect(() => {
       if (user && user.language !== language) {

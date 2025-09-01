@@ -292,7 +292,8 @@ const advanceTurnAndRound = (state: GameState): GameState => {
 };
 
 const resolveTurn = (state: GameState, tieBreakerQuestion?: Question): GameState => {
-    let newState = JSON.parse(JSON.stringify(state));
+    // FIX: Explicitly cast the cloned state to fix the TypeScript build error.
+    let newState: GameState = JSON.parse(JSON.stringify(state));
     if (!newState.activeQuestion) return newState;
 
     const { actionType } = newState.activeQuestion;
@@ -346,9 +347,9 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
             const isCorrect = normalizeAnswer(answer) === normalizeAnswer(state.activeQuestion.question.correctAnswer);
             const player = state.players.find(p => p.id === playerId);
 
-            // Update stats only for the human player
             if (player && !player.isBot) {
-                const newMatchStats = JSON.parse(JSON.stringify(state.matchStats));
+                // FIX: Explicitly cast the cloned matchStats to prevent build errors.
+                const newMatchStats: GameState['matchStats'] = JSON.parse(JSON.stringify(state.matchStats));
                 newMatchStats[playerId].total++;
                 newMatchStats[playerId].categories[category].total++;
                 if (isCorrect) {
@@ -367,7 +368,6 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
                 };
             }
 
-            // For bots, just update the answer
             return {
                 ...state,
                 activeQuestion: {
@@ -380,7 +380,8 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
 
         case 'RESOLVE_PHASE1_ROUND': {
             if (!state) return null;
-            let newState = JSON.parse(JSON.stringify(state));
+            // FIX: Explicitly cast the cloned state to fix the TypeScript build error.
+            let newState: GameState = JSON.parse(JSON.stringify(state));
             const humanPlayer = newState.players.find((p: Player) => !p.isBot)!;
             const fieldIndex = newState.board.findIndex((f: Field) => f.id === action.payload.fieldId);
         
@@ -425,6 +426,8 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
         
             newState.activeQuestion = null;
             newState.phase1Selections = {};
+            // FIX: Clear answerResult here to prevent game stall, instead of in the modal.
+            newState.answerResult = null;
             return newState;
         }
 
@@ -444,6 +447,7 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
 
         case 'PASS_BOT_TURN': {
             if (!state) return state;
+            // FIX: Explicitly cast the cloned state to fix the TypeScript build error.
             let newState: GameState = JSON.parse(JSON.stringify(state));
             const { botId, reason } = action.payload;
             const bot = newState.players.find((p: Player) => p.id === botId)!;
