@@ -444,7 +444,7 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
 
         case 'PASS_BOT_TURN': {
             if (!state) return state;
-            let newState = JSON.parse(JSON.stringify(state));
+            let newState: GameState = JSON.parse(JSON.stringify(state));
             const { botId, reason } = action.payload;
             const bot = newState.players.find((p: Player) => p.id === botId)!;
             newState.gameLog.push(`${bot.name} (Bot) přeskakuje tah: ${reason}`);
