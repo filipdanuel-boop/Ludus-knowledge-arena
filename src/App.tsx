@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Analytics } from '@vercel/analytics/react';
-import { User, Theme, GamePhase, Language, QuestionDifficulty } from './types';
+// FIX: Import 'Category' type to resolve 'Cannot find name' errors.
+import { User, Theme, GamePhase, Language, QuestionDifficulty, Category } from './types';
 import { gameReducer } from './services/gameLogic';
 import { themes } from './themes';
 import * as userService from './services/userService';
@@ -17,6 +18,7 @@ import { RulesScreen } from './components/screens/RulesScreen';
 import { GameScreen } from './components/screens/GameScreen';
 import { ProfileScreen } from './components/screens/ProfileScreen';
 import { LanguageSelectionScreen } from './components/screens/LanguageSelectionScreen';
+import { LeaderboardScreen } from './components/screens/LeaderboardScreen';
 
 
 // Import UI components
@@ -24,7 +26,7 @@ import { AdRewardModal } from './components/game/AdRewardModal';
 import { ThemeSelectionModal } from './components/game/ThemeSelectionModal';
 import { Spinner } from './components/ui/Spinner';
 
-type Screen = 'AUTH' | 'LOBBY' | 'ONLINE_LOBBY' | 'FINDING_MATCH' | 'GAME_SETUP' | 'RULES' | 'GAME' | 'PROFILE';
+type Screen = 'AUTH' | 'LOBBY' | 'ONLINE_LOBBY' | 'FINDING_MATCH' | 'GAME_SETUP' | 'RULES' | 'GAME' | 'PROFILE' | 'LEADERBOARD';
 
 // FIX: Hardcode metadata to resolve persistent module loading error
 const appMetadata = {
@@ -55,6 +57,7 @@ const AppContent = () => {
 
   React.useEffect(() => {
     // FIX: Only attempt auto-login after the language has been set.
+    // This ensures the language selection screen is always shown first for new users.
     if (isLanguageSet) {
       const loggedInUser = userService.getLoggedInUser();
       if (loggedInUser) {
@@ -63,7 +66,7 @@ const AppContent = () => {
               setLanguage(loggedInUser.language);
           }
         setUser(loggedInUser);
-        setScreen('LOBBY');
+        setScreen('LOBBY'); // Navigate to lobby on auto-login
       }
     }
   }, [isLanguageSet, language, setLanguage]);
@@ -87,7 +90,7 @@ const AppContent = () => {
     setUser(userWithCurrentLang);
     userService.saveUserData(userWithCurrentLang);
     userService.saveLoggedInUser(userWithCurrentLang.email);
-    setScreen('LOBBY');
+    setScreen('LOBBY'); // Navigate to lobby on manual login
   };
   
   const handleLogout = () => {
@@ -110,11 +113,26 @@ const AppContent = () => {
 
   const handleBackToLobby = () => {
       if (gameState?.players && user) {
-        const updatedUser = userService.loadUserData(user.email);
-        if(updatedUser) setUser(updatedUser);
+        const humanPlayer = gameState.players.find(p => !p.isBot);
+        if(humanPlayer) {
+            const playerStats = gameState.matchStats[humanPlayer.id];
+            const currentUserData = userService.loadUserData(user.email)!;
+            
+            currentUserData.xp += playerStats.xpEarned;
+            currentUserData.stats.totalCorrect += playerStats.correct;
+            currentUserData.stats.totalAnswered += playerStats.total;
+            
+            for(const category in playerStats.categories){
+                currentUserData.stats.categoryStats[category as Category].totalCorrect += playerStats.categories[category as Category].correct;
+                currentUserData.stats.categoryStats[category as Category].totalAnswered += playerStats.categories[category as Category].total;
+            }
+            
+            userService.saveUserData(currentUserData);
+            setUser(currentUserData);
+        }
       }
       dispatch({ type: 'SET_STATE', payload: { gamePhase: GamePhase.Setup }});
-      setScreen('LOBBY');
+      setScreen('PROFILE');
   };
 
   const renderScreen = () => {
@@ -140,7 +158,7 @@ const AppContent = () => {
             playerCount={onlinePlayerCount} 
             onMatchFound={() => {
                 if(user) {
-                    dispatch({ type: 'INITIALIZE_GAME', payload: { playerCount: onlinePlayerCount, user, isOnlineMode: true } });
+                    dispatch({ type: 'INITIALIZE_GAME', payload: { playerCount: onlinePlayerCount, user, isOnlineMode: true, botDifficulty: 'medium' } });
                     setScreen('GAME');
                 }
             }} 
@@ -153,6 +171,9 @@ const AppContent = () => {
        case 'PROFILE':
         if (!user) return <AuthScreen onLogin={handleLogin} themeConfig={themeConfig} />;
         return <ProfileScreen user={user} onBack={() => setScreen('LOBBY')} themeConfig={themeConfig} />;
+      case 'LEADERBOARD':
+        if (!user) return <AuthScreen onLogin={handleLogin} themeConfig={themeConfig} />;
+        return <LeaderboardScreen user={user} onBack={() => setScreen('LOBBY')} themeConfig={themeConfig} />;
       case 'GAME':
         if (!gameState || !user) return <div className="min-h-screen flex items-center justify-center"><Spinner themeConfig={themeConfig} /></div>;
         return <GameScreen 

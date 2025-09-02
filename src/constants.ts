@@ -73,6 +73,12 @@ export const BOT_SUCCESS_RATES: Record<QuestionDifficulty, number> = {
 // XP System
 export const XP_PER_CORRECT_ANSWER = 15;
 export const XP_FOR_WIN = 75;
+export const XP_DIFFICULTY_MULTIPLIER: Record<QuestionDifficulty, number> = {
+    easy: 1,
+    medium: 1.5,
+    hard: 2,
+};
+
 
 // Daily Rewards
 export const DAILY_REWARD_COINS = 50;

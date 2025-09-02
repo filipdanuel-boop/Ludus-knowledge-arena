@@ -14,6 +14,9 @@ export const translations: Record<Language, Translations> = {
     attackOrder: 'Pořadí útoků',
     onTurn: '(Na tahu)',
     close: 'Zavřít',
+    phase: 'Fáze',
+    round: 'Kolo',
+    points: 'bodů',
     
     // LanguageSelectionScreen
     chooseLanguage: 'Choose your language / Vyberte si jazyk',
@@ -52,6 +55,8 @@ export const translations: Record<Language, Translations> = {
     rulesDescription: 'Naučte se, jak se stát šampionem.',
     dailyReward: 'Denní odměna!',
     coinsReceived: 'Získal jsi +{0} mincí!',
+    leaderboardButton: 'Žebříček',
+    leaderboardDescription: 'Porovnejte své skóre s ostatními hráči.',
 
     // GameSetupScreen & OnlineLobbyScreen
     createLocalGame: 'Vytvořit Lokální Hru',
@@ -68,6 +73,9 @@ export const translations: Record<Language, Translations> = {
     difficultyEasy: 'Lehká',
     difficultyMedium: 'Střední',
     difficultyHard: 'Těžká',
+    difficultyEasyDesc: 'Boti budou dělat více chyb a hrát méně strategicky. Ideální pro seznámení se s hrou.',
+    difficultyMediumDesc: 'Boti představují vyváženou výzvu. Občas udělají chybu, ale dokáží vás potrápit.',
+    difficultyHardDesc: 'Boti jsou nekompromisní, odpovídají s vysokou přesností a hrají velmi strategicky.',
     
     // FindingMatchScreen
     findingMatch: 'Vyhledávám zápas...',
@@ -85,8 +93,6 @@ export const translations: Record<Language, Translations> = {
     rulesEliminationDesc: 'Hráč je vyřazen, pokud jeho základna ztratí poslední život (HP), nebo pokud jeho skóre klesne pod nulu.',
     
     // GameScreen & In-Game
-    phase: 'Fáze',
-    round: 'Kolo',
     evaluating: 'Vyhodnocuji...',
     loading: 'Načítám...',
     answerTheQuestion: 'Odpovězte na otázku!',
@@ -94,9 +100,11 @@ export const translations: Record<Language, Translations> = {
     waitingForPlayers: 'Čekání na ostatní hráče...',
     phase1SelectTerritory: 'Kolo {0}/{1}: Vyberte si území',
     yourTurnToAttack: 'Jste na řadě s útokem!',
-    turnOf: 'Na tahu: {0}',
-    points: 'bodů',
+    turnOfPrefix: 'Na tahu: ',
     eliminated: 'VYŘAZEN',
+    phaseLandGrab: 'Zabírání Území',
+    phaseAttacks: 'Útoky',
+    phaseGameOver: 'Konec Hry',
     
     // Modals
     adWatching: 'Sledujete Reklamu',
@@ -136,6 +144,15 @@ export const translations: Record<Language, Translations> = {
     overallSuccessRate: 'Celková úspěšnost odpovědí:',
     categoryProgress: 'Postup v kategoriích:',
     progressCompleted: '{0}% splněno',
+    viewProfile: 'Zobrazit Profil',
+    
+    // LeaderboardScreen
+    leaderboardTitle: 'Globální Žebříček',
+    rankHeader: 'Pořadí',
+    playerHeader: 'Hráč',
+    levelHeader: 'Level',
+    xpHeader: 'XP',
+    youBadge: 'Vy',
   },
   en: {
     // General
@@ -146,6 +163,9 @@ export const translations: Record<Language, Translations> = {
     attackOrder: 'Attack Order',
     onTurn: '(Your Turn)',
     close: 'Close',
+    phase: 'Phase',
+    round: 'Round',
+    points: 'points',
 
     // LanguageSelectionScreen
     chooseLanguage: 'Choose your language / Vyberte si jazyk',
@@ -184,6 +204,8 @@ export const translations: Record<Language, Translations> = {
     rulesDescription: 'Learn how to become a champion.',
     dailyReward: 'Daily Reward!',
     coinsReceived: 'You received +{0} coins!',
+    leaderboardButton: 'Leaderboard',
+    leaderboardDescription: 'Compare your score with other players.',
 
     // GameSetupScreen & OnlineLobbyScreen
     createLocalGame: 'Create Local Game',
@@ -200,6 +222,9 @@ export const translations: Record<Language, Translations> = {
     difficultyEasy: 'Easy',
     difficultyMedium: 'Medium',
     difficultyHard: 'Hard',
+    difficultyEasyDesc: 'Bots will make more mistakes and play less strategically. Ideal for getting familiar with the game.',
+    difficultyMediumDesc: 'Bots present a balanced challenge. They will make occasional mistakes but can prove to be tough opponents.',
+    difficultyHardDesc: 'Bots are uncompromising, answering with high accuracy and playing very strategically.',
 
     // FindingMatchScreen
     findingMatch: 'Finding Match...',
@@ -217,8 +242,6 @@ export const translations: Record<Language, Translations> = {
     rulesEliminationDesc: 'A player is eliminated if their base loses its last HP, or if their score drops below zero.',
     
     // GameScreen & In-Game
-    phase: 'Phase',
-    round: 'Round',
     evaluating: 'Evaluating...',
     loading: 'Loading...',
     answerTheQuestion: 'Answer the question!',
@@ -226,9 +249,11 @@ export const translations: Record<Language, Translations> = {
     waitingForPlayers: 'Waiting for other players...',
     phase1SelectTerritory: 'Round {0}/{1}: Select a territory',
     yourTurnToAttack: 'It\'s your turn to attack!',
-    turnOf: 'Turn: {0}',
-    points: 'points',
+    turnOfPrefix: 'Turn: ',
     eliminated: 'ELIMINATED',
+    phaseLandGrab: 'Land Grab',
+    phaseAttacks: 'Attacks',
+    phaseGameOver: 'Game Over',
 
     // Modals
     adWatching: 'Watching Ad',
@@ -268,6 +293,15 @@ export const translations: Record<Language, Translations> = {
     overallSuccessRate: 'Overall Success Rate:',
     categoryProgress: 'Category Progress:',
     progressCompleted: '{0}% completed',
+    viewProfile: 'View Profile',
+    
+    // LeaderboardScreen
+    leaderboardTitle: 'Global Leaderboard',
+    rankHeader: 'Rank',
+    playerHeader: 'Player',
+    levelHeader: 'Level',
+    xpHeader: 'XP',
+    youBadge: 'You',
   },
   de: {
     // General
@@ -278,6 +312,9 @@ export const translations: Record<Language, Translations> = {
     attackOrder: 'Angriffsreihenfolge',
     onTurn: '(Du bist dran)',
     close: 'Schließen',
+    phase: 'Phase',
+    round: 'Runde',
+    points: 'Punkte',
 
     // LanguageSelectionScreen
     chooseLanguage: 'Wähle deine Sprache / Choose your language',
@@ -316,6 +353,8 @@ export const translations: Record<Language, Translations> = {
     rulesDescription: 'Lerne, wie man ein Champion wird.',
     dailyReward: 'Tägliche Belohnung!',
     coinsReceived: 'Du hast +{0} Münzen erhalten!',
+    leaderboardButton: 'Bestenliste',
+    leaderboardDescription: 'Vergleiche deine Punktzahl mit anderen Spielern.',
 
     // GameSetupScreen & OnlineLobbyScreen
     createLocalGame: 'Lokales Spiel erstellen',
@@ -332,7 +371,10 @@ export const translations: Record<Language, Translations> = {
     difficultyEasy: 'Einfach',
     difficultyMedium: 'Mittel',
     difficultyHard: 'Schwer',
-    
+    difficultyEasyDesc: 'Bots machen mehr Fehler und spielen weniger strategisch. Ideal, um sich mit dem Spiel vertraut zu machen.',
+    difficultyMediumDesc: 'Bots stellen eine ausgewogene Herausforderung dar. Sie machen gelegentlich Fehler, können aber harte Gegner sein.',
+    difficultyHardDesc: 'Bots sind kompromisslos, antworten mit hoher Genauigkeit und spielen sehr strategisch.',
+
     // FindingMatchScreen
     findingMatch: 'Suche Spiel...',
     playersFoundOf: 'Spieler gefunden: {0} / {1}',
@@ -349,8 +391,6 @@ export const translations: Record<Language, Translations> = {
     rulesEliminationDesc: 'Ein Spieler scheidet aus, wenn seine Basis den letzten HP verliert oder sein Punktestand unter null fällt.',
     
     // GameScreen & In-Game
-    phase: 'Phase',
-    round: 'Runde',
     evaluating: 'Werte aus...',
     loading: 'Lade...',
     answerTheQuestion: 'Beantworte die Frage!',
@@ -358,9 +398,11 @@ export const translations: Record<Language, Translations> = {
     waitingForPlayers: 'Warte auf andere Spieler...',
     phase1SelectTerritory: 'Runde {0}/{1}: Wähle ein Gebiet',
     yourTurnToAttack: 'Du bist am Zug anzugreifen!',
-    turnOf: 'Am Zug: {0}',
-    points: 'Punkte',
+    turnOfPrefix: 'Am Zug: ',
     eliminated: 'ELIMINIERT',
+    phaseLandGrab: 'Landerwerb',
+    phaseAttacks: 'Angriffe',
+    phaseGameOver: 'Spiel vorbei',
 
     // Modals
     adWatching: 'Werbung ansehen',
@@ -400,6 +442,15 @@ export const translations: Record<Language, Translations> = {
     overallSuccessRate: 'Gesamterfolgsquote:',
     categoryProgress: 'Kategoriefortschritt:',
     progressCompleted: '{0}% abgeschlossen',
+    viewProfile: 'Profil ansehen',
+
+    // LeaderboardScreen
+    leaderboardTitle: 'Globale Bestenliste',
+    rankHeader: 'Rang',
+    playerHeader: 'Spieler',
+    levelHeader: 'Level',
+    xpHeader: 'XP',
+    youBadge: 'Du',
   },
   es: {
     // General
@@ -410,6 +461,9 @@ export const translations: Record<Language, Translations> = {
     attackOrder: 'Orden de ataque',
     onTurn: '(Tu turno)',
     close: 'Cerrar',
+    phase: 'Fase',
+    round: 'Ronda',
+    points: 'puntos',
 
     // LanguageSelectionScreen
     chooseLanguage: 'Elige tu idioma / Choose your language',
@@ -448,6 +502,8 @@ export const translations: Record<Language, Translations> = {
     rulesDescription: 'Aprende a convertirte en un campeón.',
     dailyReward: '¡Recompensa diaria!',
     coinsReceived: '¡Recibiste +{0} monedas!',
+    leaderboardButton: 'Clasificación',
+    leaderboardDescription: 'Compara tu puntuación con otros jugadores.',
 
     // GameSetupScreen & OnlineLobbyScreen
     createLocalGame: 'Crear Juego Local',
@@ -464,7 +520,10 @@ export const translations: Record<Language, Translations> = {
     difficultyEasy: 'Fácil',
     difficultyMedium: 'Medio',
     difficultyHard: 'Difícil',
-    
+    difficultyEasyDesc: 'Los bots cometerán más errores y jugarán de forma menos estratégica. Ideal para familiarizarse con el juego.',
+    difficultyMediumDesc: 'Los bots presentan un desafío equilibrado. Cometerán errores ocasionales pero pueden ser oponentes duros.',
+    difficultyHardDesc: 'Los bots son implacables, responden con alta precisión y juegan de forma muy estratégica.',
+
     // FindingMatchScreen
     findingMatch: 'Buscando partida...',
     playersFoundOf: 'Jugadores encontrados: {0} / {1}',
@@ -481,8 +540,6 @@ export const translations: Record<Language, Translations> = {
     rulesEliminationDesc: 'Un jugador es eliminado si su base pierde su último HP, o si su puntuación cae por debajo de cero.',
     
     // GameScreen & In-Game
-    phase: 'Fase',
-    round: 'Ronda',
     evaluating: 'Evaluando...',
     loading: 'Cargando...',
     answerTheQuestion: '¡Responde la pregunta!',
@@ -490,9 +547,11 @@ export const translations: Record<Language, Translations> = {
     waitingForPlayers: 'Esperando a otros jugadores...',
     phase1SelectTerritory: 'Ronda {0}/{1}: Selecciona un territorio',
     yourTurnToAttack: '¡Es tu turno de atacar!',
-    turnOf: 'Turno de: {0}',
-    points: 'puntos',
+    turnOfPrefix: 'Turno de: ',
     eliminated: 'ELIMINADO',
+    phaseLandGrab: 'Conquista de Tierras',
+    phaseAttacks: 'Ataques',
+    phaseGameOver: 'Fin del Juego',
 
     // Modals
     adWatching: 'Viendo Anuncio',
@@ -532,5 +591,14 @@ export const translations: Record<Language, Translations> = {
     overallSuccessRate: 'Tasa de Éxito General:',
     categoryProgress: 'Progreso por Categoría:',
     progressCompleted: '{0}% completado',
+    viewProfile: 'Ver Perfil',
+
+    // LeaderboardScreen
+    leaderboardTitle: 'Clasificación Global',
+    rankHeader: 'Rango',
+    playerHeader: 'Jugador',
+    levelHeader: 'Nivel',
+    xpHeader: 'XP',
+    youBadge: 'Tú',
   },
 };

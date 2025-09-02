@@ -28,7 +28,7 @@ export const ProfileScreen: React.FC<{ user: User; onBack: () => void; themeConf
                 
                 <div className={`bg-gray-800 p-6 rounded-lg border ${themeConfig.accentBorder} mb-8`}>
                     <div className="flex items-center justify-between mb-4">
-                        <h2 className={`text-3xl font-semibold ${themeConfig.accentTextLight}`}>{user.email}</h2>
+                        <h2 className={`text-3xl font-semibold ${themeConfig.accentTextLight}`}>{user.email.split('@')[0]}</h2>
                         <span className={`text-2xl font-bold bg-gray-700 px-4 py-1 rounded-lg border ${themeConfig.accentBorderSecondary}`}>{level}</span>
                     </div>
                     <div>

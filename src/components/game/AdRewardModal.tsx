@@ -22,5 +22,5 @@ export const AdRewardModal: React.FC<{ onClaim: () => void; themeConfig: typeof 
             </NeonButton>
         </div>
     </Modal>
-);
-}
+    );
+};

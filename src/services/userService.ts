@@ -1,5 +1,6 @@
-import { User, Category, Language } from '../types';
+import { User, Category, Language, LeaderboardEntry } from '../types';
 import { INITIAL_COINS } from '../constants';
+import { getLevelForXp } from '../utils';
 
 const USERS_DB_KEY = 'ludus_users';
 const LOGGED_IN_USER_KEY = 'ludus_logged_in_email';
@@ -115,3 +116,18 @@ export const addCoins = (email: string, amount: number): User | null => {
     }
     return null;
 }
+
+export const getLeaderboardData = (currentUserEmail: string): LeaderboardEntry[] => {
+    const users = getAllUsers();
+    const allUsers: User[] = Object.values(users).map(({ password, ...user }) => user);
+
+    const sortedUsers = allUsers.sort((a, b) => b.xp - a.xp);
+
+    return sortedUsers.map((user, index) => ({
+        rank: index + 1,
+        name: user.email.split('@')[0],
+        level: getLevelForXp(user.xp),
+        xp: user.xp,
+        isCurrentUser: user.email.toLowerCase() === currentUserEmail.toLowerCase(),
+    }));
+};

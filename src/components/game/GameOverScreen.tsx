@@ -44,7 +44,7 @@ export const GameOverScreen: React.FC<{ gameState: GameState; onBackToLobby: () 
                 </div>
 
                 <div className="mt-8">
-                    <NeonButton onClick={onBackToLobby} themeConfig={themeConfig}>{t('backToLobby')}</NeonButton>
+                    <NeonButton onClick={onBackToLobby} themeConfig={themeConfig}>{t('viewProfile')}</NeonButton>
                 </div>
             </div>
         </Modal>

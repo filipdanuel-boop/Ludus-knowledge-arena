@@ -78,7 +78,7 @@ export const LobbyScreen: React.FC<{
             </div>
             <div className={`absolute top-4 right-4 bg-gray-800/80 backdrop-blur-sm border ${themeConfig.accentBorder} p-3 rounded-lg flex items-center gap-4`}>
                  <button onClick={() => onNavigate('PROFILE')} className="flex flex-col text-right hover:bg-gray-700/50 p-2 rounded-md transition-colors">
-                    <p className={`${themeConfig.accentText} font-bold`}>{user.email}</p>
+                    <p className={`${themeConfig.accentText} font-bold`}>{user.email.split('@')[0]}</p>
                     <div className="flex items-center gap-2 justify-end">
                         <LuduCoin themeConfig={themeConfig} className='w-5 h-5'/>
                         <p className="text-yellow-400 text-lg font-bold">{user.luduCoins.toLocaleString()}</p>
@@ -105,7 +105,7 @@ export const LobbyScreen: React.FC<{
             ) : (
                 <div className="h-8 bg-gray-700/50 rounded w-3/4 md:w-1/2 mx-auto mb-8 animate-pulse"></div>
             )}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-3xl">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-5xl">
                 <div className="flex flex-col items-center">
                     <NeonButton onClick={() => onNavigate('GAME_SETUP')} themeConfig={themeConfig} className="w-full h-24 text-2xl">
                         {t('playLocallyButton')}
@@ -119,12 +119,18 @@ export const LobbyScreen: React.FC<{
                     <p className="text-gray-400 mt-2 text-center">{t('playOnlineDescription')}</p>
                 </div>
                 <div className="flex flex-col items-center">
+                    <NeonButton onClick={() => onNavigate('LEADERBOARD')} themeConfig={themeConfig} className="w-full h-24 text-2xl">
+                        {t('leaderboardButton')}
+                    </NeonButton>
+                    <p className="text-gray-400 mt-2 text-center">{t('leaderboardDescription')}</p>
+                </div>
+                <div className="flex flex-col items-center md:col-span-1">
                     <NeonButton onClick={onGetFreeCoins} variant="secondary" themeConfig={themeConfig} className="w-full h-24 text-2xl">
                         {t('getFreeCoinsButton')}
                     </NeonButton>
                     <p className="text-gray-400 mt-2 text-center">{t('getFreeCoinsDescription')}</p>
                 </div>
-                <div className="flex flex-col items-center">
+                <div className="flex flex-col items-center md:col-span-2">
                     <NeonButton onClick={() => onNavigate('RULES')} variant="secondary" themeConfig={themeConfig} className="w-full h-24 text-2xl">
                         {t('rulesButton')}
                     </NeonButton>

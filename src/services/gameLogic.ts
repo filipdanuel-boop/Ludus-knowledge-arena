@@ -1,5 +1,5 @@
-import { GameState, GameAction, Player, Field, GamePhase, FieldType, Category, User, Question, UserStats, QuestionDifficulty } from '../types';
-import { CATEGORIES, PLAYER_COLORS, BASE_HP, FIELD_HP, BOT_NAMES, POINTS, PHASE_DURATIONS, ELIMINATION_COIN_BONUS, XP_PER_CORRECT_ANSWER, XP_FOR_WIN, BOT_SUCCESS_RATES } from '../constants';
+import { GameState, GameAction, Player, Field, GamePhase, FieldType, Category, User, Question, QuestionDifficulty } from '../types';
+import { CATEGORIES, PLAYER_COLORS, BASE_HP, FIELD_HP, BOT_NAMES, POINTS, PHASE_DURATIONS, ELIMINATION_COIN_BONUS, XP_PER_CORRECT_ANSWER, XP_FOR_WIN, BOT_SUCCESS_RATES, XP_DIFFICULTY_MULTIPLIER } from '../constants';
 import { normalizeAnswer } from '../utils';
 
 
@@ -62,7 +62,6 @@ export const createInitialGameState = (playerCount: number, user: User, isOnline
         field.maxHp = FIELD_HP;
     });
 
-    // Initialize stats for the match
     const matchStats = players.reduce((acc, player) => {
         if (!player.isBot) {
             acc[player.id] = { correct: 0, total: 0, xpEarned: 0, categories: Object.values(Category).reduce((catAcc, cat) => {
@@ -86,7 +85,7 @@ export const createInitialGameState = (playerCount: number, user: User, isOnline
         gameStartTime: Date.now(),
         answerResult: null,
         eliminationResult: null,
-        questionHistory: [], // Start fresh for each game
+        questionHistory: [],
         matchStats,
         botDifficulty: botDifficulty || 'medium',
     };
@@ -102,48 +101,100 @@ export const getAttackers = (players: Player[]): Player[] => {
     return sortedPlayers.slice(0, attackerCount);
 };
 
-export const decideBotAction = (gameState: GameState): { action: 'HEAL' | 'ATTACK' | 'PASS', targetField?: Field, category?: Category, reason?: string } => {
+// --- Bot Decision Making ---
+export const decideBotAction = (gameState: GameState): { action: 'HEAL' | 'ATTACK' | 'PASS', targetField?: Field, category?: Category, reason?: string, difficulty?: QuestionDifficulty } => {
     const bot = gameState.players[gameState.currentTurnPlayerIndex];
     const botBase = gameState.board.find(f => f.ownerId === bot.id && f.type === 'PLAYER_BASE');
 
+    // Priority 1: Heal if base is critically low.
     if (botBase && botBase.hp < botBase.maxHp && (botBase.hp === 1 || Math.random() < 0.5)) {
-        return { action: 'HEAL', targetField: botBase, category: botBase.category! };
+        return { action: 'HEAL', targetField: botBase, category: botBase.category!, difficulty: 'medium' };
     }
     
-    const validTargets = gameState.board.filter(f => f.ownerId !== bot.id && f.type !== 'NEUTRAL');
-    if (validTargets.length === 0) {
+    // Priority 2: Attack other players.
+    const potentialTargets = gameState.board
+        .filter(f => f.ownerId !== bot.id && f.type !== 'NEUTRAL') // Can attack owned fields or black fields
+        .map(target => {
+            let score = 0;
+            const owner = gameState.players.find(p => p.id === target.ownerId);
+
+            // High priority for bases
+            if (target.type === 'PLAYER_BASE') {
+                score += 100;
+                // Extra points for low HP bases
+                score += (target.maxHp - target.hp) * 50;
+            }
+
+            // Priority for black fields (high risk/reward)
+            if (target.type === 'BLACK') {
+                score += 40;
+            }
+
+            // Prioritize weaker players
+            if (owner) {
+                const activePlayers = gameState.players.filter(p => !p.isEliminated);
+                const sortedPlayers = [...activePlayers].sort((a, b) => b.score - a.score);
+                const ownerRank = sortedPlayers.findIndex(p => p.id === owner.id); // 0 is highest score
+                if(ownerRank !== -1) {
+                    score += (activePlayers.length - 1 - ownerRank) * 20; // More points for lower ranked players
+                }
+            } else {
+                // It's a black field, give it a base priority
+                score += 10;
+            }
+            
+            // Add some randomness to avoid deterministic behavior
+            score += Math.random() * 15;
+
+            return { field: target, priority: score };
+        });
+
+    if (potentialTargets.length === 0) {
         return { action: 'PASS', reason: "Nebyly nalezeny žádné platné cíle." };
     }
 
-    const targetField = validTargets[Math.floor(Math.random() * validTargets.length)];
-    const isBaseAttack = targetField.type === 'PLAYER_BASE';
+    // Select the target with the highest priority score
+    potentialTargets.sort((a, b) => b.priority - a.priority);
+    const bestTarget = potentialTargets[0].field;
+
+    const isBaseAttack = bestTarget.type === 'PLAYER_BASE';
     let category: Category;
+    let difficulty: QuestionDifficulty;
 
     if (isBaseAttack) {
-        category = targetField.category!;
-    } else if (targetField.type === 'BLACK') {
+        category = bestTarget.category!;
+        difficulty = 'hard';
+    } else if (bestTarget.type === 'BLACK') {
         category = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
-    } else {
+        difficulty = 'hard';
+    } else { // Regular owned field
         const availableCategories = CATEGORIES.filter(c => !bot.usedAttackCategories.includes(c));
-        if (availableCategories.length === 0) { 
-            return { action: 'PASS', reason: "Vyčerpány kategorie." }; 
+        if (availableCategories.length === 0) {
+            // All categories used, reset them for the bot
+            bot.usedAttackCategories = [];
+            category = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
+        } else {
+            category = availableCategories[Math.floor(Math.random() * availableCategories.length)];
         }
-        category = availableCategories[Math.floor(Math.random() * availableCategories.length)];
+        difficulty = 'medium';
     }
 
-    return { action: 'ATTACK', targetField, category };
+    return { action: 'ATTACK', targetField: bestTarget, category, difficulty };
 };
 
+
+// --- Turn Resolution Logic ---
+
 const handleHealAction = (state: GameState) => {
-    const { attackerId, targetFieldId, playerAnswers, question } = state.activeQuestion!;
+    const { attackerId, playerAnswers, question } = state.activeQuestion!;
     const attacker = state.players.find(p => p.id === attackerId)!;
-    const field = state.board.find(f => f.id === targetFieldId)!;
+    const field = state.board.find(f => f.ownerId === attackerId && f.type === 'PLAYER_BASE')!;
     const isCorrect = normalizeAnswer(playerAnswers[attackerId] || "") === normalizeAnswer(question.correctAnswer);
 
     if (isCorrect) {
         field.hp = Math.min(field.maxHp, field.hp + 1);
         attacker.score += POINTS.HEAL_SUCCESS;
-        if(!attacker.isBot) state.matchStats[attacker.id].xpEarned += XP_PER_CORRECT_ANSWER;
+        if(!attacker.isBot) state.matchStats[attacker.id].xpEarned += XP_PER_CORRECT_ANSWER * XP_DIFFICULTY_MULTIPLIER[question.difficulty];
         state.gameLog.push(`${attacker.name} si úspěšně opravil základnu.`);
     } else {
         attacker.score += POINTS.HEAL_FAIL_PENALTY;
@@ -162,8 +213,8 @@ const handleAttackAction = (state: GameState, tieBreakerQuestion?: Question) => 
         const isAttackerCorrect = normalizeAnswer(playerAnswers[attackerId] || "") === normalizeAnswer(question.correctAnswer);
         const isDefenderCorrect = normalizeAnswer(playerAnswers[defenderId] || "") === normalizeAnswer(question.correctAnswer);
 
-        if(!attacker.isBot && isAttackerCorrect) state.matchStats[attacker.id].xpEarned += XP_PER_CORRECT_ANSWER;
-        if(!defender.isBot && isDefenderCorrect) state.matchStats[defender.id].xpEarned += XP_PER_CORRECT_ANSWER;
+        if(!attacker.isBot && isAttackerCorrect) state.matchStats[attacker.id].xpEarned += XP_PER_CORRECT_ANSWER * XP_DIFFICULTY_MULTIPLIER[question.difficulty];
+        if(!defender.isBot && isDefenderCorrect) state.matchStats[defender.id].xpEarned += XP_PER_CORRECT_ANSWER * XP_DIFFICULTY_MULTIPLIER[question.difficulty];
 
         if (isAttackerCorrect && isDefenderCorrect && !isBaseAttack && !state.activeQuestion!.isTieBreaker) {
             if (tieBreakerQuestion) {
@@ -207,7 +258,7 @@ const handleAttackAction = (state: GameState, tieBreakerQuestion?: Question) => 
             field.ownerId = attackerId;
             field.type = FieldType.Neutral;
             field.hp = field.maxHp;
-            if(!attacker.isBot) state.matchStats[attacker.id].xpEarned += XP_PER_CORRECT_ANSWER;
+            if(!attacker.isBot) state.matchStats[attacker.id].xpEarned += XP_PER_CORRECT_ANSWER * XP_DIFFICULTY_MULTIPLIER[question.difficulty];
             attacker.score += POINTS.BLACK_FIELD_CLAIM;
             state.gameLog.push(`${attacker.name} zabral černé území!`);
         } else {
@@ -292,8 +343,7 @@ const advanceTurnAndRound = (state: GameState): GameState => {
 };
 
 const resolveTurn = (state: GameState, tieBreakerQuestion?: Question): GameState => {
-    // FIX: Explicitly cast the cloned state to fix the TypeScript build error.
-    let newState: GameState = JSON.parse(JSON.stringify(state));
+    let newState = JSON.parse(JSON.stringify(state)) as GameState;
     if (!newState.activeQuestion) return newState;
 
     const { actionType } = newState.activeQuestion;
@@ -348,8 +398,7 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
             const player = state.players.find(p => p.id === playerId);
 
             if (player && !player.isBot) {
-                // FIX: Explicitly cast the cloned matchStats to prevent build errors.
-                const newMatchStats: GameState['matchStats'] = JSON.parse(JSON.stringify(state.matchStats));
+                const newMatchStats = JSON.parse(JSON.stringify(state.matchStats)) as GameState['matchStats'];
                 newMatchStats[playerId].total++;
                 newMatchStats[playerId].categories[category].total++;
                 if (isCorrect) {
@@ -380,15 +429,15 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
 
         case 'RESOLVE_PHASE1_ROUND': {
             if (!state) return null;
-            // FIX: Explicitly cast the cloned state to fix the TypeScript build error.
-            let newState: GameState = JSON.parse(JSON.stringify(state));
+            let newState = JSON.parse(JSON.stringify(state)) as GameState;
             const humanPlayer = newState.players.find((p: Player) => !p.isBot)!;
             const fieldIndex = newState.board.findIndex((f: Field) => f.id === action.payload.fieldId);
+            const questionDifficulty = newState.activeQuestion?.question.difficulty || 'medium';
         
             if (action.payload.humanActionResult === 'win') {
                 newState.board[fieldIndex].ownerId = humanPlayer.id;
                 humanPlayer.score += POINTS.PHASE1_CLAIM;
-                newState.matchStats[humanPlayer.id].xpEarned += XP_PER_CORRECT_ANSWER;
+                newState.matchStats[humanPlayer.id].xpEarned += XP_PER_CORRECT_ANSWER * XP_DIFFICULTY_MULTIPLIER[questionDifficulty];
                 newState.gameLog.push(`${humanPlayer.name} jste zabral pole a získal ${POINTS.PHASE1_CLAIM} bodů.`);
             } else {
                 newState.board[fieldIndex].type = FieldType.Black;
@@ -426,7 +475,6 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
         
             newState.activeQuestion = null;
             newState.phase1Selections = {};
-            // FIX: Clear answerResult here to prevent game stall, instead of in the modal.
             newState.answerResult = null;
             return newState;
         }
@@ -447,8 +495,7 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
 
         case 'PASS_BOT_TURN': {
             if (!state) return state;
-            // FIX: Explicitly cast the cloned state to fix the TypeScript build error.
-            let newState: GameState = JSON.parse(JSON.stringify(state));
+            let newState = JSON.parse(JSON.stringify(state)) as GameState;
             const { botId, reason } = action.payload;
             const bot = newState.players.find((p: Player) => p.id === botId)!;
             newState.gameLog.push(`${bot.name} (Bot) přeskakuje tah: ${reason}`);

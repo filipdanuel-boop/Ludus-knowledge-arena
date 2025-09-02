@@ -5,9 +5,10 @@ import { useTranslation } from '../../i18n/LanguageContext';
 
 export const AnswerFeedbackModal: React.FC<{ result: GameState['answerResult']; onClear: () => void; themeConfig: typeof themes[Theme] }> = ({ result, onClear, themeConfig }) => {
     const { t } = useTranslation();
-    
-    // FIX: Removed the internal timer to prevent race conditions with the game logic.
-    // The parent component now controls when this modal is cleared.
+
+    // The internal timer was removed to prevent race conditions.
+    // The parent GameScreen component now controls the lifecycle of this modal
+    // by clearing the `answerResult` state after a delay.
 
     if (!result) return null;
     

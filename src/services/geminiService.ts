@@ -1,6 +1,6 @@
 // FIX: Import 'Type' for using responseSchema.
 import { GoogleGenAI, Type } from "@google/genai";
-import type { Question, Language, Category } from '../types';
+import type { Question, Language, Category, QuestionDifficulty } from '../types';
 import { questionBank } from './questionBank';
 import { normalizeAnswer } from '../utils';
 
@@ -15,32 +15,29 @@ if (!apiKey) {
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 // FIX: Correctly flatten questions from different difficulties into one array.
-const getQuestionFromBank = (category: Category, history: string[]): Question | null => {
-    const categoryQuestions = questionBank[category]?.multipleChoice;
-    if (!categoryQuestions) return null;
-    const allQuestions = Object.values(categoryQuestions).flat();
-    if (allQuestions.length === 0) return null;
+const getQuestionFromBank = (category: Category, history: string[], difficulty: QuestionDifficulty): Question | null => {
+    const categoryQuestions = questionBank[category]?.multipleChoice[difficulty];
+    if (!categoryQuestions || categoryQuestions.length === 0) return null;
 
-    const availableQuestions = allQuestions.filter(q => !history.includes(q.question));
+    const availableQuestions = categoryQuestions.filter(q => !history.includes(q.question));
     if (availableQuestions.length > 0) {
         return availableQuestions[Math.floor(Math.random() * availableQuestions.length)];
     }
-    // Fallback to all questions if all have been used
-    return allQuestions[Math.floor(Math.random() * allQuestions.length)];
+    
+    // Fallback to any question of the difficulty if all have been used
+    return categoryQuestions[Math.floor(Math.random() * categoryQuestions.length)];
 };
 
 // FIX: Correctly flatten questions from different difficulties into one array.
-const getOpenEndedQuestionFromBank = (category: Category, history: string[]): Question | null => {
-    const categoryQuestions = questionBank[category]?.openEnded;
-    if (!categoryQuestions) return null;
-    const allQuestions = Object.values(categoryQuestions).flat();
-    if (allQuestions.length === 0) return null;
+const getOpenEndedQuestionFromBank = (category: Category, history: string[], difficulty: QuestionDifficulty): Question | null => {
+    const categoryQuestions = questionBank[category]?.openEnded[difficulty];
+    if (!categoryQuestions || categoryQuestions.length === 0) return null;
     
-    const availableQuestions = allQuestions.filter(q => !history.includes(q.question));
+    const availableQuestions = categoryQuestions.filter(q => !history.includes(q.question));
      if (availableQuestions.length > 0) {
         return availableQuestions[Math.floor(Math.random() * availableQuestions.length)];
     }
-    return allQuestions[Math.floor(Math.random() * allQuestions.length)];
+    return categoryQuestions[Math.floor(Math.random() * categoryQuestions.length)];
 };
 
 const translateQuestionPayload = async (question: Question, targetLang: Language): Promise<Question> => {
@@ -61,7 +58,6 @@ Maintain the original JSON structure. Respond ONLY with the final translated JSO
 Input:
 ${JSON.stringify(sourceObject, null, 2)}`;
 
-        // FIX: Use responseSchema for structured JSON output as recommended by guidelines.
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
@@ -82,23 +78,20 @@ ${JSON.stringify(sourceObject, null, 2)}`;
             }
         });
         
-        // FIX: The response text is now clean JSON due to responseSchema, so markdown cleaning is removed.
         const cleanedJson = (response.text ?? '').trim();
         if (!cleanedJson) {
             console.error("Chyba při překladu: API vrátilo prázdnou odpověď.");
-            return question; // Fallback to original question
+            return question;
         }
         const translatedObject = JSON.parse(cleanedJson);
 
-        // FIX: Add missing 'difficulty' property.
         const finalQuestion: Question = {
+            ...question, // Retain original properties like difficulty
             question: translatedObject.question || question.question,
             correctAnswer: translatedObject.correctAnswer || question.correctAnswer,
             options: translatedObject.options || question.options,
-            difficulty: question.difficulty
         };
 
-        // Ensure correctAnswer matches one of the translated options exactly
         if (finalQuestion.options && Array.isArray(finalQuestion.options)) {
             const correctOption = finalQuestion.options.find(opt => normalizeAnswer(opt) === normalizeAnswer(finalQuestion.correctAnswer));
             finalQuestion.correctAnswer = correctOption || finalQuestion.correctAnswer;
@@ -112,19 +105,18 @@ ${JSON.stringify(sourceObject, null, 2)}`;
     }
 };
 
-export const generateQuestion = async (category: Category, history: string[], targetLang: Language): Promise<Question | null> => {
-    const baseQuestion = getQuestionFromBank(category, history);
+export const generateQuestion = async (category: Category, history: string[], targetLang: Language, difficulty: QuestionDifficulty): Promise<Question | null> => {
+    const baseQuestion = getQuestionFromBank(category, history, difficulty);
     if (!baseQuestion) return null;
     return translateQuestionPayload(baseQuestion, targetLang);
 };
 
-export const generateOpenEndedQuestion = async (category: Category, history: string[], targetLang: Language): Promise<Question | null> => {
-    const baseQuestion = getOpenEndedQuestionFromBank(category, history);
+export const generateOpenEndedQuestion = async (category: Category, history: string[], targetLang: Language, difficulty: QuestionDifficulty): Promise<Question | null> => {
+    const baseQuestion = getOpenEndedQuestionFromBank(category, history, difficulty);
     if (!baseQuestion) return null;
     return translateQuestionPayload(baseQuestion, targetLang);
 };
 
-// FIX: Added language parameter to generate a translated intro.
 export const generateLobbyIntro = async (appName: string, appDescription: string, userName: string, targetLang: Language): Promise<string | null> => {
     const languageMap: Record<Language, string> = {
         cs: 'Czech',
