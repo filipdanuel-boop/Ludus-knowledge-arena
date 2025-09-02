@@ -18,4 +18,4 @@ export const OnlineLobbyScreen: React.FC<{ onStartGame: (playerCount: number) =>
             </div>
         </div>
     );
-}
+};

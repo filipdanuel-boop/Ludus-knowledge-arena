@@ -168,14 +168,13 @@ export const decideBotAction = (gameState: GameState): { action: 'HEAL' | 'ATTAC
         category = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
         difficulty = 'hard';
     } else { // Regular owned field
-        const availableCategories = CATEGORIES.filter(c => !bot.usedAttackCategories.includes(c));
+        let availableCategories = CATEGORIES.filter(c => !bot.usedAttackCategories.includes(c));
         if (availableCategories.length === 0) {
-            // All categories used, reset them for the bot
-            bot.usedAttackCategories = [];
-            category = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
-        } else {
-            category = availableCategories[Math.floor(Math.random() * availableCategories.length)];
+            // All categories used, reset them for the bot by allowing all categories again.
+            // The actual state update will happen in the reducer.
+            availableCategories = [...CATEGORIES];
         }
+        category = availableCategories[Math.floor(Math.random() * availableCategories.length)];
         difficulty = 'medium';
     }
 
@@ -204,10 +203,20 @@ const handleHealAction = (state: GameState) => {
 };
 
 const handleAttackAction = (state: GameState, tieBreakerQuestion?: Question) => {
-    const { attackerId, defenderId, targetFieldId, playerAnswers, question, isBaseAttack } = state.activeQuestion!;
+    const { attackerId, defenderId, targetFieldId, playerAnswers, question, isBaseAttack, category } = state.activeQuestion!;
     const attacker = state.players.find(p => p.id === attackerId)!;
     const field = state.board.find(f => f.id === targetFieldId)!;
     
+    // Update bot used categories
+    if (attacker.isBot && !isBaseAttack) {
+        let availableCategories = CATEGORIES.filter(c => !attacker.usedAttackCategories.includes(c));
+        if (availableCategories.length === 0) {
+            attacker.usedAttackCategories = [category]; // Reset and add current
+        } else {
+            attacker.usedAttackCategories.push(category);
+        }
+    }
+
     if (defenderId) {
         const defender = state.players.find(p => p.id === defenderId)!;
         const isAttackerCorrect = normalizeAnswer(playerAnswers[attackerId] || "") === normalizeAnswer(question.correctAnswer);
@@ -229,10 +238,11 @@ const handleAttackAction = (state: GameState, tieBreakerQuestion?: Question) => 
                  state.questionHistory.push(tieBreakerQuestion.question);
                  state.gameLog.push(`ROZSTŘEL mezi ${attacker.name} a ${defender.name}!`);
                  return state;
+            } else {
+                // No tiebreaker question available, defense holds. No score change.
+                state.gameLog.push(`${defender.name} ubránil své území v napínavém souboji!`);
             }
-        }
-        
-        if (isAttackerCorrect && (!isDefenderCorrect || isBaseAttack)) {
+        } else if (isAttackerCorrect) { // Attacker wins (includes base attack where defender was also correct)
             field.hp -= 1;
             if (isBaseAttack) {
                 attacker.score += POINTS.ATTACK_DAMAGE;
@@ -244,15 +254,15 @@ const handleAttackAction = (state: GameState, tieBreakerQuestion?: Question) => 
                 defender.score += POINTS.ATTACK_LOSS_DEFENDER;
                 state.gameLog.push(`${attacker.name} dobyl území od hráče ${defender.name}!`);
             }
-        } else if (!isAttackerCorrect && isDefenderCorrect) {
+        } else if (isDefenderCorrect) { // Defender wins
             attacker.score += POINTS.ATTACK_LOSS_ATTACKER;
             if (!isBaseAttack) defender.score += POINTS.ATTACK_WIN_DEFENDER;
             state.gameLog.push(`${defender.name} ubránil své území.`);
-        } else {
+        } else { // Both wrong
             attacker.score += POINTS.ATTACK_LOSS_ATTACKER;
-            state.gameLog.push(`Útok hráče ${attacker.name} se nezdařil.`);
+            state.gameLog.push(`Útok hráče ${attacker.name} se nezdařil, oba odpověděli špatně.`);
         }
-    } else {
+    } else { // Handle attacking neutral/black field
         const isAttackerCorrect = normalizeAnswer(playerAnswers[attackerId] || "") === normalizeAnswer(question.correctAnswer);
         if (isAttackerCorrect) {
             field.ownerId = attackerId;
@@ -491,7 +501,9 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
 
         case 'UPDATE_PLAYERS':
              if (!state) return state;
-             return { ...state, players: action.payload };
+             // Create new player objects to ensure immutability
+             const updatedPlayers = action.payload.map(p => ({ ...p }));
+             return { ...state, players: updatedPlayers };
 
         case 'PASS_BOT_TURN': {
             if (!state) return state;

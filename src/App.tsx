@@ -81,8 +81,17 @@ const AppContent = () => {
 
   React.useEffect(() => {
     localStorage.setItem('ludus_theme', theme);
-    Object.values(themes).forEach(t => document.body.classList.remove(t.background));
-    document.body.classList.add(themeConfig.background);
+
+    // More robust theme switching to prevent errors
+    const prevThemeClasses = document.body.dataset.themeClasses;
+    if (prevThemeClasses) {
+        document.body.classList.remove(...prevThemeClasses.split(' '));
+    }
+
+    const newThemeClasses = themeConfig.background.split(' ');
+    document.body.classList.add(...newThemeClasses);
+    document.body.dataset.themeClasses = newThemeClasses.join(' ');
+
   }, [theme, themeConfig]);
 
   const handleLogin = (loggedInUser: User) => {
@@ -114,7 +123,7 @@ const AppContent = () => {
   const handleBackToLobby = () => {
       if (gameState?.players && user) {
         const humanPlayer = gameState.players.find(p => !p.isBot);
-        if(humanPlayer) {
+        if(humanPlayer && gameState.matchStats[humanPlayer.id]) {
             const playerStats = gameState.matchStats[humanPlayer.id];
             const currentUserData = userService.loadUserData(user.email)!;
             

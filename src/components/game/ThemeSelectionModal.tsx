@@ -39,4 +39,4 @@ export const ThemeSelectionModal: React.FC<ThemeSelectionModalProps> = ({ isOpen
         </div>
     </Modal>
 );
-}
+};

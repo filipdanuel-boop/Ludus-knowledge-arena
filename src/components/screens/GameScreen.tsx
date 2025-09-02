@@ -7,6 +7,7 @@ import { generateQuestion, generateOpenEndedQuestion } from '../../services/gemi
 import { CATEGORIES, PHASE_DURATIONS, WIN_COINS_PER_PLAYER, BOT_SUCCESS_RATES } from '../../constants';
 import { normalizeAnswer } from '../../utils';
 import { decideBotAction, getAttackers } from '../../services/gameLogic';
+import { useTranslation } from '../../i18n/LanguageContext';
 
 
 // Import Game Components
@@ -19,6 +20,7 @@ import { SpectatorQuestionModal } from '../game/SpectatorQuestionModal';
 import { CategorySelectionModal } from '../game/CategorySelectionModal';
 import { AnswerFeedbackModal } from '../game/AnswerFeedbackModal';
 import { EliminationFeedbackModal } from '../game/EliminationFeedbackModal';
+import { Spinner } from '../ui/Spinner';
 
 interface GameScreenProps {
     gameState: GameState;
@@ -30,6 +32,7 @@ interface GameScreenProps {
 }
 
 export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, user, setUser, onBackToLobby, themeConfig }) => {
+    const { t } = useTranslation();
     const [isProcessingQuestion, setIsProcessingQuestion] = React.useState(false);
     const [attackTarget, setAttackTarget] = React.useState<{ targetFieldId: number; defenderId?: string; isBaseAttack: boolean; } | null>(null);
     const [gameTime, setGameTime] = React.useState(0);
@@ -37,6 +40,17 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
     
     const botTurnTimeoutRef = React.useRef<number | null>(null);
     const logicTimeoutRef = React.useRef<number | null>(null);
+    
+    // CRITICAL: Check for transient invalid state to prevent render crash.
+    // This can happen for a single frame when a player is eliminated.
+    const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
+    if (!currentPlayer) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <Spinner themeConfig={themeConfig} />
+            </div>
+        );
+    }
     
     // Game Timer Effect
     React.useEffect(() => {
@@ -64,26 +78,22 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
             if (field.type === 'NEUTRAL' && !field.ownerId) {
                 dispatch({ type: 'SET_PHASE1_SELECTION', payload: { playerId: humanPlayer.id, fieldId }});
                 setIsProcessingQuestion(true);
-                // FIX: Pass botDifficulty to generateQuestion call.
                 const question = await generateQuestion(field.category!, gameState.questionHistory, user.language, gameState.botDifficulty);
                 setIsProcessingQuestion(false);
                 if (question) {
-                    // FIX: Add missing 'category' property to the dispatch payload.
                     dispatch({ type: 'SET_QUESTION', payload: { question, questionType: 'MULTIPLE_CHOICE', targetFieldId: fieldId, attackerId: humanPlayer.id, isBaseAttack: false, isTieBreaker: false, playerAnswers: { [humanPlayer.id]: null }, startTime: Date.now(), actionType: 'ATTACK', category: field.category! } });
                 }
             }
         } else if (gameState.gamePhase === GamePhase.Phase2_Attacks) {
-            const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
-            if (currentPlayer.isBot || currentPlayer.id !== humanPlayer.id || !getAttackers(gameState.players).some(p => p.id === currentPlayer.id)) return;
+            const currentPlayerFromState = gameState.players[gameState.currentTurnPlayerIndex];
+            if (currentPlayerFromState.isBot || currentPlayerFromState.id !== humanPlayer.id || !getAttackers(gameState.players).some(p => p.id === currentPlayerFromState.id)) return;
     
-            if (field.ownerId === currentPlayer.id && field.type === 'PLAYER_BASE' && field.hp < field.maxHp) {
+            if (field.ownerId === currentPlayerFromState.id && field.type === 'PLAYER_BASE' && field.hp < field.maxHp) {
                  setIsProcessingQuestion(true);
-                 // FIX: Pass botDifficulty to generateQuestion call.
                  const question = await generateQuestion(field.category!, gameState.questionHistory, user.language, gameState.botDifficulty);
                  setIsProcessingQuestion(false);
                  if (question) {
-                     // FIX: Add missing 'category' property to the dispatch payload.
-                     dispatch({ type: 'SET_QUESTION', payload: { question, questionType: 'MULTIPLE_CHOICE', targetFieldId: fieldId, attackerId: currentPlayer.id, isBaseAttack: false, isTieBreaker: false, actionType: 'HEAL', playerAnswers: { [currentPlayer.id]: null }, startTime: Date.now(), category: field.category! } });
+                     dispatch({ type: 'SET_QUESTION', payload: { question, questionType: 'MULTIPLE_CHOICE', targetFieldId: fieldId, attackerId: currentPlayerFromState.id, isBaseAttack: false, isTieBreaker: false, actionType: 'HEAL', playerAnswers: { [currentPlayerFromState.id]: null }, startTime: Date.now(), category: field.category! } });
                  }
                  return;
             }
@@ -91,14 +101,12 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
             if (field.type === 'BLACK') {
                 setIsProcessingQuestion(true);
                 const randomCategory = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
-                // FIX: Pass botDifficulty to generateQuestion call.
                 const question = await generateQuestion(randomCategory, gameState.questionHistory, user.language, gameState.botDifficulty);
                 setIsProcessingQuestion(false);
                 if (question) {
-                     // FIX: Add missing 'category' property to the dispatch payload.
-                     dispatch({ type: 'SET_QUESTION', payload: { question, questionType: 'MULTIPLE_CHOICE', targetFieldId: fieldId, attackerId: currentPlayer.id, isBaseAttack: false, isTieBreaker: false, actionType: 'ATTACK', playerAnswers: { [currentPlayer.id]: null }, startTime: Date.now(), category: randomCategory } });
+                     dispatch({ type: 'SET_QUESTION', payload: { question, questionType: 'MULTIPLE_CHOICE', targetFieldId: fieldId, attackerId: currentPlayerFromState.id, isBaseAttack: false, isTieBreaker: false, actionType: 'ATTACK', playerAnswers: { [currentPlayerFromState.id]: null }, startTime: Date.now(), category: randomCategory } });
                 }
-            } else if (field.ownerId && field.ownerId !== currentPlayer.id) {
+            } else if (field.ownerId && field.ownerId !== currentPlayerFromState.id) {
                 setAttackTarget({ targetFieldId: fieldId, defenderId: field.ownerId, isBaseAttack: field.type === 'PLAYER_BASE' });
             }
         }
@@ -106,21 +114,19 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
     
     const handleCategorySelect = async (category: Category) => {
         if (!attackTarget) return;
-        const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
+        const currentPlayerFromState = gameState.players[gameState.currentTurnPlayerIndex];
         
         setAttackTarget(null);
         setIsProcessingQuestion(true);
-        // FIX: Pass botDifficulty to generateQuestion call.
         const question = await generateQuestion(category, gameState.questionHistory, user.language, gameState.botDifficulty);
         setIsProcessingQuestion(false);
     
         if (question) {
             const { targetFieldId, defenderId, isBaseAttack } = attackTarget;
-            const playerAnswers: Record<string, null> = { [currentPlayer.id]: null };
+            const playerAnswers: Record<string, null> = { [currentPlayerFromState.id]: null };
             if (defenderId) playerAnswers[defenderId] = null;
     
-            // FIX: Add missing 'category' property to the dispatch payload.
-            dispatch({ type: 'SET_QUESTION', payload: { question, questionType: 'MULTIPLE_CHOICE', targetFieldId, attackerId: currentPlayer.id, defenderId, isBaseAttack, isTieBreaker: false, playerAnswers, startTime: Date.now(), actionType: 'ATTACK', category: category } });
+            dispatch({ type: 'SET_QUESTION', payload: { question, questionType: 'MULTIPLE_CHOICE', targetFieldId, attackerId: currentPlayerFromState.id, defenderId, isBaseAttack, isTieBreaker: false, playerAnswers, startTime: Date.now(), actionType: 'ATTACK', category: category } });
         }
     };
 
@@ -130,7 +136,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
         if(logicTimeoutRef.current) clearTimeout(logicTimeoutRef.current);
 
         const humanPlayer = gameState.players.find(p => !p.isBot)!;
-        // FIX: Add missing 'category' property to the dispatch payload.
         dispatch({ type: 'SUBMIT_ANSWER', payload: { playerId: humanPlayer.id, answer, category: gameState.activeQuestion.category } });
 
         const updatedActiveQuestion = { ...gameState.activeQuestion, playerAnswers: { ...gameState.activeQuestion.playerAnswers, [humanPlayer.id]: answer } };
@@ -163,7 +168,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
         }
 
         const { action, targetField, category, difficulty } = decision;
-        // FIX: Pass difficulty to generateQuestion call.
         const question = await generateQuestion(category!, gameState.questionHistory, 'cs', difficulty!);
         
         if (!question) {
@@ -175,7 +179,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
         const playerAnswers: Record<string, string | null> = { [bot.id]: null };
         if (defender) playerAnswers[defender.id] = null;
 
-        // FIX: Add missing 'category' property to the dispatch payload.
         dispatch({ type: 'SET_QUESTION', payload: {
             question,
             questionType: 'MULTIPLE_CHOICE',
@@ -190,39 +193,30 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
             category: category!
         }});
 
-        // Bot submits its answer immediately
-        // FIX: Add missing 'category' property to the dispatch payload.
         dispatch({ type: 'SUBMIT_ANSWER', payload: { playerId: bot.id, answer: Math.random() < BOT_SUCCESS_RATES[gameState.botDifficulty] ? question.correctAnswer : "wrong", category: category! } });
 
-        // If defender is human, wait for their answer. Otherwise, resolve immediately.
         if (defender && !defender.isBot) {
             // Human will answer via UI, which will trigger RESOLVE_TURN
         } else {
             if (defender && defender.isBot) {
-                 // FIX: Add missing 'category' property to the dispatch payload.
                  dispatch({ type: 'SUBMIT_ANSWER', payload: { playerId: defender.id, answer: Math.random() < BOT_SUCCESS_RATES[gameState.botDifficulty] ? question.correctAnswer : "wrong_2", category: category! } });
             }
-            // Use timeout to give a feeling of action
             setTimeout(() => dispatch({ type: 'RESOLVE_TURN' }), 2000);
         }
     }, [gameState, dispatch]);
 
 
     // --- GAME FLOW EFFECTS ---
-    
-    // Effect to handle resolving Phase 1 after human player answers
     React.useEffect(() => {
         if (gameState.gamePhase === GamePhase.Phase1_LandGrab && gameState.answerResult) {
             const humanPlayer = gameState.players.find(p => !p.isBot)!;
-            // Check if it's the human player's result we're seeing
             if (gameState.answerResult.playerId === humanPlayer.id && gameState.activeQuestion) {
                 const fieldId = gameState.activeQuestion.targetFieldId;
                 const result = gameState.answerResult.isCorrect ? 'win' : 'loss';
                 
-                // Use a short timeout to allow the feedback modal to show
                 const timeoutId = setTimeout(() => {
                     dispatch({ type: 'RESOLVE_PHASE1_ROUND', payload: { humanActionResult: result, fieldId } });
-                }, 2000); 
+                }, 1500); // Shortened delay for smoother flow
 
                 return () => clearTimeout(timeoutId);
             }
@@ -230,7 +224,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
     }, [gameState.gamePhase, gameState.answerResult, gameState.activeQuestion, gameState.players, dispatch]);
 
 
-    // Effect to handle Phase 1 bot selections
     React.useEffect(() => {
         if (gameState.gamePhase === GamePhase.Phase1_LandGrab) {
             const humanPlayer = gameState.players.find(p => !p.isBot)!;
@@ -249,25 +242,21 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
         }
     }, [gameState.gamePhase, gameState.phase1Selections, gameState.players, dispatch]);
 
-    // Effect for tie-breakers
     React.useEffect(() => {
         if(logicTimeoutRef.current) clearTimeout(logicTimeoutRef.current);
 
         const triggerTiebreaker = async () => {
             if (gameState.activeQuestion?.isTieBreaker === false && gameState.activeQuestion.defenderId) {
                 const { attackerId, defenderId, question } = gameState.activeQuestion;
-                const attacker = gameState.players.find(p => p.id === attackerId)!;
-                const defender = gameState.players.find(p => p.id === defenderId)!;
                 const isAttackerCorrect = normalizeAnswer(gameState.activeQuestion.playerAnswers[attackerId] || '') === normalizeAnswer(question.correctAnswer);
                 const isDefenderCorrect = normalizeAnswer(gameState.activeQuestion.playerAnswers[defenderId] || '') === normalizeAnswer(question.correctAnswer);
                 
                 if (isAttackerCorrect && isDefenderCorrect) {
                      setIsProcessingQuestion(true);
+                     const defender = gameState.players.find(p => p.id === defenderId)!;
                      const langForTiebreaker = defender.isBot ? 'cs' : user.language;
-                     // FIX: Pass 'hard' difficulty to generateOpenEndedQuestion call.
                      const tieBreakerQuestion = await generateOpenEndedQuestion(gameState.board.find(f => f.id === gameState.activeQuestion!.targetFieldId)!.category!, gameState.questionHistory, langForTiebreaker, 'hard');
                      setIsProcessingQuestion(false);
-                     // FIX: Convert null to undefined to fix TypeScript build error (TS2322)
                      dispatch({ type: 'RESOLVE_TURN', payload: { tieBreakerQuestion: tieBreakerQuestion || undefined }});
                 } else {
                      dispatch({ type: 'RESOLVE_TURN' });
@@ -276,24 +265,22 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
         };
 
         if (gameState.activeQuestion && Object.values(gameState.activeQuestion.playerAnswers).every(ans => ans !== null)) {
-            logicTimeoutRef.current = window.setTimeout(triggerTiebreaker, 2000);
+            logicTimeoutRef.current = window.setTimeout(triggerTiebreaker, 1500);
         }
 
     }, [gameState.activeQuestion, gameState.players, user.language, dispatch]);
 
-    // Effect for bot turn logic
     React.useEffect(() => {
         if (botTurnTimeoutRef.current) clearTimeout(botTurnTimeoutRef.current);
         if (gameState.gamePhase === GamePhase.Phase2_Attacks && !gameState.activeQuestion && !isProcessingQuestion && !gameState.answerResult && !gameState.eliminationResult) {
-            const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
-            if (currentPlayer?.isBot && getAttackers(gameState.players).some(p => p.id === currentPlayer.id)) {
+            const currentPlayerFromState = gameState.players[gameState.currentTurnPlayerIndex];
+            if (currentPlayerFromState?.isBot && getAttackers(gameState.players).some(p => p.id === currentPlayerFromState.id)) {
                 botTurnTimeoutRef.current = window.setTimeout(handleBotAttackTurn, 2000);
             }
         }
         return () => { if (botTurnTimeoutRef.current) clearTimeout(botTurnTimeoutRef.current); };
     }, [gameState, isProcessingQuestion, handleBotAttackTurn]);
 
-    // Effect to update user coins at game end
     React.useEffect(() => {
         if (gameState.gamePhase === GamePhase.GameOver) {
             const humanPlayer = gameState.players.find(p => !p.isBot);
@@ -305,30 +292,24 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
         }
     }, [gameState.gamePhase, gameState.players, gameState.winners, setUser]);
 
-    const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
     const humanPlayer = gameState.players.find(p => !p.isBot)!;
     const isHumanAnswering = gameState.activeQuestion?.playerAnswers.hasOwnProperty(humanPlayer.id);
 
     const getHeaderText = () => {
-        // FIX: Add guard for undefined currentPlayer to prevent runtime crashes
-        if (!currentPlayer) {
-            return <>Vyhodnocuji...</>;
-        }
-        // FIX: Always return JSX fragments to prevent React error #31
-        if (gameState.answerResult) return <>Vyhodnocuji...</>;
-        if (isProcessingQuestion) return <>Načítám...</>;
+        if (gameState.answerResult) return <>{t('evaluating')}</>;
+        if (isProcessingQuestion) return <>{t('loading')}</>;
         if (gameState.activeQuestion) {
-             if (isHumanAnswering && gameState.activeQuestion.playerAnswers[humanPlayer.id] === null) return <>Odpovězte na otázku!</>;
-             return <>Soupeř je na tahu...</>;
+             if (isHumanAnswering && gameState.activeQuestion.playerAnswers[humanPlayer.id] === null) return <>{t('answerTheQuestion')}</>;
+             return <>{t('opponentTurn')}</>;
         }
         if (gameState.gamePhase === GamePhase.Phase1_LandGrab) {
-             if (gameState.phase1Selections?.[humanPlayer.id]) return <>Čekání na ostatní hráče...</>;
-             return <>Kolo {gameState.round}/{PHASE_DURATIONS.PHASE1_ROUNDS}: Vyberte si území</>;
+             if (gameState.phase1Selections?.[humanPlayer.id]) return <>{t('waitingForPlayers')}</>;
+             return <>{t('phase1SelectTerritory', gameState.round, PHASE_DURATIONS.PHASE1_ROUNDS)}</>;
         }
         if (gameState.gamePhase === GamePhase.Phase2_Attacks && getAttackers(gameState.players).some(p => p.id === humanPlayer.id) && currentPlayer.id === humanPlayer.id) {
-            return <>Jste na řadě s útokem!</>;
+            return <>{t('yourTurnToAttack')}</>;
         }
-        return <>Na tahu: <span className={`font-bold text-${currentPlayer.color}-400`}>{currentPlayer.name}</span></>;
+        return <>{t('turnOfPrefix')}<span className={`font-bold text-${currentPlayer.color}-400`}>{currentPlayer.name}</span></>;
     };
     
     const formatTime = (ms: number) => {
@@ -338,7 +319,14 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
         return `${minutes}:${seconds}`;
     };
 
-    const phaseName = gameState.gamePhase.replace(/PHASE_\\d+_/,'').replace(/_/g, ' ');
+    const getPhaseName = (phase: GamePhase) => {
+        switch(phase) {
+            case GamePhase.Phase1_LandGrab: return t('phaseLandGrab');
+            case GamePhase.Phase2_Attacks: return t('phaseAttacks');
+            case GamePhase.GameOver: return t('phaseGameOver');
+            default: return phase;
+        }
+    }
 
     return (
         <div className="min-h-screen flex flex-col">
@@ -346,8 +334,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
             <header className={`bg-gray-800/50 p-4 border-b ${themeConfig.accentBorder}`}>
                 <div className="flex justify-between items-center">
                     <div>
-                        <h1 className={`text-2xl font-bold ${themeConfig.accentText} capitalize`}>Fáze: {phaseName.toLowerCase()}</h1>
-                        <p className="text-gray-400">Kolo: {gameState.round}</p>
+                        <h1 className={`text-2xl font-bold ${themeConfig.accentText}`}>{t('phase')}: {getPhaseName(gameState.gamePhase)}</h1>
+                        <p className="text-gray-400">{t('round')}: {gameState.round}</p>
                     </div>
                     <div className={`text-2xl font-mono ${themeConfig.accentTextLight}`}>{formatTime(gameTime)}</div>
                     <div className="text-right"><h2 className="text-xl">{getHeaderText()}</h2></div>
@@ -361,10 +349,10 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
                     />
                 </div>
                 <aside className={`md:w-1/3 lg:w-1/4 bg-gray-900/50 p-4 border-t md:border-t-0 md:border-l ${themeConfig.accentBorder} order-1 md:order-2 overflow-y-auto`}>
-                    <h2 className={`text-2xl font-bold ${themeConfig.accentTextLight} border-b border-gray-700 pb-2 mb-4`}>Hráči</h2>
+                    <h2 className={`text-2xl font-bold ${themeConfig.accentTextLight} border-b border-gray-700 pb-2 mb-4`}>{t('players')}</h2>
                     <PlayerStatusUI players={gameState.players} currentPlayerId={currentPlayer?.id} board={gameState.board} themeConfig={themeConfig} />
                     {gameState.gamePhase === GamePhase.Phase2_Attacks && <AttackOrderUI attackers={getAttackers(gameState.players)} currentPlayerId={currentPlayer?.id} themeConfig={themeConfig} />}
-                    <h2 className={`text-2xl font-bold ${themeConfig.accentTextLight} border-b border-gray-700 pb-2 mb-4 mt-6`}>Záznam Hry</h2>
+                    <h2 className={`text-2xl font-bold ${themeConfig.accentTextLight} border-b border-gray-700 pb-2 mb-4 mt-6`}>{t('gameLog')}</h2>
                     <div className="h-64 overflow-y-auto bg-gray-800 p-2 rounded-md">
                         {gameState.gameLog.slice().reverse().map((log, i) => <p key={i} className="text-sm text-gray-400 mb-1">{log}</p>)}
                     </div>
