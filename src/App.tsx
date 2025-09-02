@@ -66,7 +66,7 @@ const AppContent = () => {
               setLanguage(loggedInUser.language);
           }
         setUser(loggedInUser);
-        setScreen('LOBBY'); // Navigate to lobby on auto-login
+        setScreen('PROFILE'); // Navigate to profile on auto-login
       }
     }
   }, [isLanguageSet, language, setLanguage]);
@@ -81,17 +81,10 @@ const AppContent = () => {
 
   React.useEffect(() => {
     localStorage.setItem('ludus_theme', theme);
-
-    // More robust theme switching to prevent errors
-    const prevThemeClasses = document.body.dataset.themeClasses;
-    if (prevThemeClasses) {
-        document.body.classList.remove(...prevThemeClasses.split(' '));
-    }
-
-    const newThemeClasses = themeConfig.background.split(' ');
-    document.body.classList.add(...newThemeClasses);
-    document.body.dataset.themeClasses = newThemeClasses.join(' ');
-
+    // FIX: Simplify theme application for robustness. This replaces all existing
+    // classes on the body with the new theme's background classes, avoiding
+    // potential issues with complex class names and manual removal.
+    document.body.className = themeConfig.background;
   }, [theme, themeConfig]);
 
   const handleLogin = (loggedInUser: User) => {
@@ -99,7 +92,7 @@ const AppContent = () => {
     setUser(userWithCurrentLang);
     userService.saveUserData(userWithCurrentLang);
     userService.saveLoggedInUser(userWithCurrentLang.email);
-    setScreen('LOBBY'); // Navigate to lobby on manual login
+    setScreen('PROFILE'); // Navigate to profile on manual login
   };
   
   const handleLogout = () => {
@@ -141,7 +134,7 @@ const AppContent = () => {
         }
       }
       dispatch({ type: 'SET_STATE', payload: { gamePhase: GamePhase.Setup }});
-      setScreen('PROFILE');
+      setScreen('LOBBY');
   };
 
   const renderScreen = () => {

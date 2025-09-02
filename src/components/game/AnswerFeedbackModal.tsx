@@ -3,12 +3,13 @@ import { GameState, Theme } from '../../types';
 import { themes } from '../../themes';
 import { useTranslation } from '../../i18n/LanguageContext';
 
-export const AnswerFeedbackModal: React.FC<{ result: GameState['answerResult']; onClear: () => void; themeConfig: typeof themes[Theme] }> = ({ result, onClear, themeConfig }) => {
+export const AnswerFeedbackModal: React.FC<{ result: GameState['answerResult']; themeConfig: typeof themes[Theme] }> = ({ result, themeConfig }) => {
     const { t } = useTranslation();
 
-    // The internal timer was removed to prevent race conditions.
+    // CRITICAL FIX: The internal timer was removed to prevent race conditions.
     // The parent GameScreen component now controls the lifecycle of this modal
-    // by clearing the `answerResult` state after a delay.
+    // by clearing the `answerResult` state after a delay. This makes the state
+    // management more predictable and robust.
 
     if (!result) return null;
     

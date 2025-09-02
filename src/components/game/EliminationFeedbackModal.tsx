@@ -3,13 +3,11 @@ import { GameState, Theme } from '../../types';
 import { themes } from '../../themes';
 import { useTranslation } from '../../i18n/LanguageContext';
 
-export const EliminationFeedbackModal: React.FC<{ result: GameState['eliminationResult']; onClear: () => void; themeConfig: typeof themes[Theme] }> = ({ result, onClear, themeConfig }) => {
+export const EliminationFeedbackModal: React.FC<{ result: GameState['eliminationResult']; themeConfig: typeof themes[Theme] }> = ({ result, themeConfig }) => {
     const { t } = useTranslation();
     
-    React.useEffect(() => {
-        const timer = setTimeout(onClear, 2000);
-        return () => clearTimeout(timer);
-    }, [onClear]);
+    // CRITICAL FIX: The internal timer was removed to prevent race conditions.
+    // The parent GameScreen component now controls the lifecycle of this modal.
 
     if (!result) return null;
 

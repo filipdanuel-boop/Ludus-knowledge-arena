@@ -125,9 +125,9 @@ export const decideBotAction = (gameState: GameState): { action: 'HEAL' | 'ATTAC
 // --- Turn Resolution Logic ---
 
 const handleHealAction = (state: GameState) => {
-    const { attackerId, targetFieldId, playerAnswers, question } = state.activeQuestion!;
+    const { attackerId, playerAnswers, question } = state.activeQuestion!;
     const attacker = state.players.find(p => p.id === attackerId)!;
-    const field = state.board.find(f => f.id === targetFieldId)!;
+    const field = state.board.find(f => f.ownerId === attackerId && f.type === 'PLAYER_BASE')!;
     const isCorrect = normalizeAnswer(playerAnswers[attackerId] || "") === normalizeAnswer(question.correctAnswer);
 
     if (isCorrect) {
@@ -166,11 +166,14 @@ const handleAttackAction = (state: GameState, tieBreakerQuestion?: Question) => 
                  state.questionHistory.push(tieBreakerQuestion.question);
                  state.gameLog.push(`ROZSTŘEL mezi ${attacker.name} a ${defender.name}!`);
                  return state; // Return early, don't resolve turn yet
+            } else {
+                // If no tie-breaker, it's a successful defense
+                state.gameLog.push(`${defender.name} ubránil své území v napínavém souboji!`);
             }
         }
         
         // Resolve combat
-        if (isAttackerCorrect && (!isDefenderCorrect || isBaseAttack)) { // Attacker wins
+        else if (isAttackerCorrect) { // Attacker wins (covers defender wrong, or base attacks)
             field.hp -= 1;
             if (isBaseAttack) {
                 attacker.score += POINTS.ATTACK_DAMAGE;
@@ -182,13 +185,13 @@ const handleAttackAction = (state: GameState, tieBreakerQuestion?: Question) => 
                 defender.score += POINTS.ATTACK_LOSS_DEFENDER;
                 state.gameLog.push(`${attacker.name} dobyl území od hráče ${defender.name}!`);
             }
-        } else if (!isAttackerCorrect && isDefenderCorrect) { // Defender wins
+        } else if (isDefenderCorrect) { // Defender wins
             attacker.score += POINTS.ATTACK_LOSS_ATTACKER;
             if (!isBaseAttack) defender.score += POINTS.ATTACK_WIN_DEFENDER;
             state.gameLog.push(`${defender.name} ubránil své území.`);
-        } else { // Both wrong or other cases
+        } else { // Both wrong
             attacker.score += POINTS.ATTACK_LOSS_ATTACKER;
-            state.gameLog.push(`Útok hráče ${attacker.name} se nezdařil.`);
+            state.gameLog.push(`Útok hráče ${attacker.name} se nezdařil, oba odpověděli špatně.`);
         }
     } else { // Handle attacking neutral/black field
         const isAttackerCorrect = normalizeAnswer(playerAnswers[attackerId] || "") === normalizeAnswer(question.correctAnswer);

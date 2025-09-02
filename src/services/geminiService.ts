@@ -14,7 +14,6 @@ if (!apiKey) {
 }
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
-// FIX: Correctly flatten questions from different difficulties into one array.
 const getQuestionFromBank = (category: Category, history: string[], difficulty: QuestionDifficulty): Question | null => {
     const categoryQuestions = questionBank[category]?.multipleChoice[difficulty];
     if (!categoryQuestions || categoryQuestions.length === 0) return null;
@@ -23,12 +22,10 @@ const getQuestionFromBank = (category: Category, history: string[], difficulty: 
     if (availableQuestions.length > 0) {
         return availableQuestions[Math.floor(Math.random() * availableQuestions.length)];
     }
-    
-    // Fallback to any question of the difficulty if all have been used
+    // Fallback to all questions if all have been used
     return categoryQuestions[Math.floor(Math.random() * categoryQuestions.length)];
 };
 
-// FIX: Correctly flatten questions from different difficulties into one array.
 const getOpenEndedQuestionFromBank = (category: Category, history: string[], difficulty: QuestionDifficulty): Question | null => {
     const categoryQuestions = questionBank[category]?.openEnded[difficulty];
     if (!categoryQuestions || categoryQuestions.length === 0) return null;
@@ -58,6 +55,7 @@ Maintain the original JSON structure. Respond ONLY with the final translated JSO
 Input:
 ${JSON.stringify(sourceObject, null, 2)}`;
 
+        // FIX: Use responseSchema for structured JSON output as recommended by guidelines.
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
@@ -78,20 +76,20 @@ ${JSON.stringify(sourceObject, null, 2)}`;
             }
         });
         
+        // FIX: The response text is now clean JSON due to responseSchema, so markdown cleaning is removed.
         const cleanedJson = (response.text ?? '').trim();
-        if (!cleanedJson) {
-            console.error("Chyba při překladu: API vrátilo prázdnou odpověď.");
-            return question;
-        }
+        if (!cleanedJson) return question; // Guard against empty responses
+
         const translatedObject = JSON.parse(cleanedJson);
 
         const finalQuestion: Question = {
-            ...question, // Retain original properties like difficulty
+            ...question, // Keep original properties like difficulty
             question: translatedObject.question || question.question,
             correctAnswer: translatedObject.correctAnswer || question.correctAnswer,
-            options: translatedObject.options || question.options,
+            options: translatedObject.options || question.options
         };
 
+        // Ensure correctAnswer matches one of the translated options exactly
         if (finalQuestion.options && Array.isArray(finalQuestion.options)) {
             const correctOption = finalQuestion.options.find(opt => normalizeAnswer(opt) === normalizeAnswer(finalQuestion.correctAnswer));
             finalQuestion.correctAnswer = correctOption || finalQuestion.correctAnswer;
@@ -126,8 +124,8 @@ export const generateLobbyIntro = async (appName: string, appDescription: string
     };
     const languageName = languageMap[targetLang];
     
-    const defaultIntro = `Vítej v aréně, ${userName}! Dokaž své znalosti ve hře ${appName} a dobyj území. Hodně štěstí!`;
-    if (!ai) return defaultIntro;
+    // Let the caller handle the fallback translation if Gemini fails.
+    if (!ai) return null;
     
     try {
         const prompt = `You are an AI game host for a game named '${appName}'. The game's description is: '${appDescription}'. Write a short, energetic, and friendly greeting for a player named '${userName}', welcoming them to the lobby. Briefly mention it's a battle of knowledge and territory conquest. Be concise (max 2-3 sentences) and speak in ${languageName}.`;
@@ -136,9 +134,11 @@ export const generateLobbyIntro = async (appName: string, appDescription: string
             contents: prompt,
             config: { temperature: 0.7 }
         });
-        return (response.text ?? '').trim() || defaultIntro;
+        // Return null if response is empty so UI can use its translated fallback.
+        return (response.text ?? '').trim() || null;
     } catch (error) {
         console.error("Chyba při generování úvodu do lobby z Gemini:", error);
-        return defaultIntro;
+        // Return null on error so UI can use its translated fallback.
+        return null;
     }
 };

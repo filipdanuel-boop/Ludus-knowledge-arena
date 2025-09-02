@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { GameState, User, Theme, Player, Category, GamePhase } from '../../types';
 import { themes } from '../../themes';
@@ -41,7 +40,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
     const botTurnTimeoutRef = React.useRef<number | null>(null);
     const logicTimeoutRef = React.useRef<number | null>(null);
     
-    // CRITICAL: Check for transient invalid state to prevent render crash.
+    // CRITICAL FIX: Check for transient invalid state to prevent render crash.
     // This can happen for a single frame when a player is eliminated.
     const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
     if (!currentPlayer) {
@@ -61,6 +60,20 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
         }, 1000);
         return () => clearInterval(timer);
     }, [gameState.gamePhase, gameState.gameStartTime]);
+
+    // CRITICAL FIX: Effect to automatically clear feedback modals after a delay.
+    // This centralizes control and prevents race conditions from child components.
+    React.useEffect(() => {
+        let timer: number;
+        if (gameState.answerResult) {
+            timer = window.setTimeout(() => dispatch({ type: 'CLEAR_ANSWER_FEEDBACK' }), 1500);
+        }
+        if (gameState.eliminationResult) {
+             timer = window.setTimeout(() => dispatch({ type: 'CLEAR_ELIMINATION_FEEDBACK' }), 2000);
+        }
+        return () => clearTimeout(timer);
+    }, [gameState.answerResult, gameState.eliminationResult, dispatch]);
+
 
     const handleRotateBoard = (direction: 'left' | 'right') => {
         const angle = direction === 'left' ? 60 : -60;
@@ -137,15 +150,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
 
         const humanPlayer = gameState.players.find(p => !p.isBot)!;
         dispatch({ type: 'SUBMIT_ANSWER', payload: { playerId: humanPlayer.id, answer, category: gameState.activeQuestion.category } });
-
-        const updatedActiveQuestion = { ...gameState.activeQuestion, playerAnswers: { ...gameState.activeQuestion.playerAnswers, [humanPlayer.id]: answer } };
-        const allPlayersAnswered = Object.values(updatedActiveQuestion.playerAnswers).every(ans => ans !== null);
-
-        if (allPlayersAnswered) {
-            logicTimeoutRef.current = window.setTimeout(() => {
-                dispatch({ type: 'RESOLVE_TURN' });
-            }, 2000);
-        }
     };
 
     const handleUseHint = () => {
@@ -216,7 +220,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
                 
                 const timeoutId = setTimeout(() => {
                     dispatch({ type: 'RESOLVE_PHASE1_ROUND', payload: { humanActionResult: result, fieldId } });
-                }, 1500); // Shortened delay for smoother flow
+                }, 1500);
 
                 return () => clearTimeout(timeoutId);
             }
@@ -245,7 +249,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
     React.useEffect(() => {
         if(logicTimeoutRef.current) clearTimeout(logicTimeoutRef.current);
 
-        const triggerTiebreaker = async () => {
+        const triggerAction = async () => {
             if (gameState.activeQuestion?.isTieBreaker === false && gameState.activeQuestion.defenderId) {
                 const { attackerId, defenderId, question } = gameState.activeQuestion;
                 const isAttackerCorrect = normalizeAnswer(gameState.activeQuestion.playerAnswers[attackerId] || '') === normalizeAnswer(question.correctAnswer);
@@ -261,11 +265,13 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
                 } else {
                      dispatch({ type: 'RESOLVE_TURN' });
                 }
+            } else if (gameState.activeQuestion) {
+                 dispatch({ type: 'RESOLVE_TURN' });
             }
         };
 
         if (gameState.activeQuestion && Object.values(gameState.activeQuestion.playerAnswers).every(ans => ans !== null)) {
-            logicTimeoutRef.current = window.setTimeout(triggerTiebreaker, 1500);
+            logicTimeoutRef.current = window.setTimeout(triggerAction, 1500);
         }
 
     }, [gameState.activeQuestion, gameState.players, user.language, dispatch]);
@@ -295,6 +301,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
     const humanPlayer = gameState.players.find(p => !p.isBot)!;
     const isHumanAnswering = gameState.activeQuestion?.playerAnswers.hasOwnProperty(humanPlayer.id);
 
+    // ROBUSTNESS FIX: Ensure all return paths are valid JSX to prevent React Error #31.
     const getHeaderText = () => {
         if (gameState.answerResult) return <>{t('evaluating')}</>;
         if (isProcessingQuestion) return <>{t('loading')}</>;
@@ -384,8 +391,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
                     themeConfig={themeConfig}
                 />
             )}
-            {gameState.answerResult && <AnswerFeedbackModal result={gameState.answerResult} themeConfig={themeConfig} onClear={() => dispatch({type: 'CLEAR_ANSWER_FEEDBACK'})} />}
-            {gameState.eliminationResult && <EliminationFeedbackModal result={gameState.eliminationResult} themeConfig={themeConfig} onClear={() => dispatch({type: 'CLEAR_ELIMINATION_FEEDBACK'})} />}
+            {gameState.answerResult && <AnswerFeedbackModal result={gameState.answerResult} themeConfig={themeConfig} />}
+            {gameState.eliminationResult && <EliminationFeedbackModal result={gameState.eliminationResult} themeConfig={themeConfig} />}
         </div>
     );
 };
