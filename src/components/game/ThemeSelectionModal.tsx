@@ -28,7 +28,7 @@ export const ThemeSelectionModal: React.FC<ThemeSelectionModalProps> = ({ isOpen
                             onClick={() => onSelectTheme(themeKey)}
                             className={`p-4 rounded-lg border-2 transition-all duration-200 ${currentTheme === themeKey ? `${loopThemeConfig.accentBorderOpaque} ${loopThemeConfig.accentShadow.replace('/10','')}` : 'border-gray-600 hover:border-gray-500'}`}
                         >
-                            <span className={`text-xl font-bold ${loopThemeConfig.accentText}`}>{loopThemeConfig.name}</span>
+                            <span className={`text-xl font-bold ${loopThemeConfig.accentText}`}>{t(loopThemeConfig.name)}</span>
                         </button>
                     );
                 })}

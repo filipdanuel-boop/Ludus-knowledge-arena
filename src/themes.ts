@@ -1,4 +1,3 @@
-
 import { Theme } from './types';
 
 export const themes: Record<Theme, {
@@ -18,7 +17,7 @@ export const themes: Record<Theme, {
     luduCoinGradient: { stopColor1: string, stopColor2: string};
 }> = {
     default: {
-        name: 'Kyberpunk',
+        name: 'themeNameCyberpunk',
         background: 'bg-gray-900',
         accentText: 'text-cyan-400',
         accentTextLight: 'text-cyan-300',
@@ -34,7 +33,7 @@ export const themes: Record<Theme, {
         luduCoinGradient: { stopColor1: '#e0f2fe', stopColor2: '#7dd3fc'},
     },
     forest: {
-        name: 'Les',
+        name: 'themeNameForest',
         background: 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-gray-700 via-green-900 to-black',
         accentText: 'text-lime-400',
         accentTextLight: 'text-lime-300',
@@ -50,7 +49,7 @@ export const themes: Record<Theme, {
         luduCoinGradient: { stopColor1: '#f7fee7', stopColor2: '#d9f99d'},
     },
     ocean: {
-        name: 'Oceán',
+        name: 'themeNameOcean',
         background: 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-gray-700 via-blue-900 to-black',
         accentText: 'text-sky-400',
         accentTextLight: 'text-sky-300',
@@ -66,7 +65,7 @@ export const themes: Record<Theme, {
         luduCoinGradient: { stopColor1: '#e0f2fe', stopColor2: '#bae6fd'},
     },
     inferno: {
-        name: 'Peklo',
+        name: 'themeNameInferno',
         background: 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-gray-700 via-red-900 to-black',
         accentText: 'text-amber-400',
         accentTextLight: 'text-amber-300',

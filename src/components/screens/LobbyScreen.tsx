@@ -25,16 +25,15 @@ export const LobbyScreen: React.FC<{
     const [reward, setReward] = React.useState<number | null>(null);
 
     React.useEffect(() => {
-        const userName = user.email.split('@')[0];
+        const userName = user.nickname;
         if (appMetadata) {
-            // FIX: Pass language to generateLobbyIntro to get a translated greeting.
             generateLobbyIntro(appMetadata.name, appMetadata.description, userName, language)
                 .then(text => setIntroText(text || t('defaultWelcome', userName, appMetadata.name)))
                 .catch(() => setIntroText(t('defaultWelcome', userName, appMetadata.name)));
         } else {
             setIntroText(t('defaultWelcome', userName, "LUDUS"));
         }
-    }, [appMetadata, user.email, language, t]);
+    }, [appMetadata, user.nickname, language, t]);
     
     React.useEffect(() => {
         const today = new Date().toISOString().split('T')[0];
@@ -78,7 +77,7 @@ export const LobbyScreen: React.FC<{
             </div>
             <div className={`absolute top-4 right-4 bg-gray-800/80 backdrop-blur-sm border ${themeConfig.accentBorder} p-3 rounded-lg flex items-center gap-4`}>
                  <button onClick={() => onNavigate('PROFILE')} className="flex flex-col text-right hover:bg-gray-700/50 p-2 rounded-md transition-colors">
-                    <p className={`${themeConfig.accentText} font-bold`}>{user.email.split('@')[0]}</p>
+                    <p className={`${themeConfig.accentText} font-bold`}>{user.nickname}</p>
                     <div className="flex items-center gap-2 justify-end">
                         <LuduCoin themeConfig={themeConfig} className='w-5 h-5'/>
                         <p className="text-yellow-400 text-lg font-bold">{user.luduCoins.toLocaleString()}</p>

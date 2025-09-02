@@ -111,6 +111,7 @@ export interface UserStats {
 
 export interface User {
   email: string;
+  nickname: string;
   luduCoins: number;
   language: Language;
   xp: number;

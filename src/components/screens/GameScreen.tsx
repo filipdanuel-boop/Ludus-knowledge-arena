@@ -3,6 +3,7 @@ import { GameState, User, Theme, Player, Category, GamePhase } from '../../types
 import { themes } from '../../themes';
 import { GameAction } from '../../types';
 import { generateQuestion, generateOpenEndedQuestion } from '../../services/geminiService';
+// FIX: Import BOT_SUCCESS_RATES to resolve reference errors.
 import { CATEGORIES, PHASE_DURATIONS, WIN_COINS_PER_PLAYER, BOT_SUCCESS_RATES } from '../../constants';
 import { normalizeAnswer } from '../../utils';
 import { decideBotAction, getAttackers } from '../../services/gameLogic';
@@ -39,7 +40,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
     
     const botTurnTimeoutRef = React.useRef<number | null>(null);
     const logicTimeoutRef = React.useRef<number | null>(null);
-    
+
     // CRITICAL FIX: Check for transient invalid state to prevent render crash.
     // This can happen for a single frame when a player is eliminated.
     const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
@@ -91,7 +92,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
             if (field.type === 'NEUTRAL' && !field.ownerId) {
                 dispatch({ type: 'SET_PHASE1_SELECTION', payload: { playerId: humanPlayer.id, fieldId }});
                 setIsProcessingQuestion(true);
-                const question = await generateQuestion(field.category!, gameState.questionHistory, user.language, gameState.botDifficulty);
+                const question = await generateQuestion(field.category!, gameState.questionHistory, user.language, 'easy');
                 setIsProcessingQuestion(false);
                 if (question) {
                     dispatch({ type: 'SET_QUESTION', payload: { question, questionType: 'MULTIPLE_CHOICE', targetFieldId: fieldId, attackerId: humanPlayer.id, isBaseAttack: false, isTieBreaker: false, playerAnswers: { [humanPlayer.id]: null }, startTime: Date.now(), actionType: 'ATTACK', category: field.category! } });
@@ -103,7 +104,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
     
             if (field.ownerId === currentPlayerFromState.id && field.type === 'PLAYER_BASE' && field.hp < field.maxHp) {
                  setIsProcessingQuestion(true);
-                 const question = await generateQuestion(field.category!, gameState.questionHistory, user.language, gameState.botDifficulty);
+                 const question = await generateQuestion(field.category!, gameState.questionHistory, user.language, 'medium');
                  setIsProcessingQuestion(false);
                  if (question) {
                      dispatch({ type: 'SET_QUESTION', payload: { question, questionType: 'MULTIPLE_CHOICE', targetFieldId: fieldId, attackerId: currentPlayerFromState.id, isBaseAttack: false, isTieBreaker: false, actionType: 'HEAL', playerAnswers: { [currentPlayerFromState.id]: null }, startTime: Date.now(), category: field.category! } });
@@ -114,7 +115,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
             if (field.type === 'BLACK') {
                 setIsProcessingQuestion(true);
                 const randomCategory = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
-                const question = await generateQuestion(randomCategory, gameState.questionHistory, user.language, gameState.botDifficulty);
+                const question = await generateQuestion(randomCategory, gameState.questionHistory, user.language, 'hard');
                 setIsProcessingQuestion(false);
                 if (question) {
                      dispatch({ type: 'SET_QUESTION', payload: { question, questionType: 'MULTIPLE_CHOICE', targetFieldId: fieldId, attackerId: currentPlayerFromState.id, isBaseAttack: false, isTieBreaker: false, actionType: 'ATTACK', playerAnswers: { [currentPlayerFromState.id]: null }, startTime: Date.now(), category: randomCategory } });
@@ -131,7 +132,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
         
         setAttackTarget(null);
         setIsProcessingQuestion(true);
-        const question = await generateQuestion(category, gameState.questionHistory, user.language, gameState.botDifficulty);
+        const question = await generateQuestion(category, gameState.questionHistory, user.language, 'medium');
         setIsProcessingQuestion(false);
     
         if (question) {
@@ -249,32 +250,19 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
     React.useEffect(() => {
         if(logicTimeoutRef.current) clearTimeout(logicTimeoutRef.current);
 
-        const triggerAction = async () => {
-            if (gameState.activeQuestion?.isTieBreaker === false && gameState.activeQuestion.defenderId) {
-                const { attackerId, defenderId, question } = gameState.activeQuestion;
-                const isAttackerCorrect = normalizeAnswer(gameState.activeQuestion.playerAnswers[attackerId] || '') === normalizeAnswer(question.correctAnswer);
-                const isDefenderCorrect = normalizeAnswer(gameState.activeQuestion.playerAnswers[defenderId] || '') === normalizeAnswer(question.correctAnswer);
-                
-                if (isAttackerCorrect && isDefenderCorrect) {
-                     setIsProcessingQuestion(true);
-                     const defender = gameState.players.find(p => p.id === defenderId)!;
-                     const langForTiebreaker = defender.isBot ? 'cs' : user.language;
-                     const tieBreakerQuestion = await generateOpenEndedQuestion(gameState.board.find(f => f.id === gameState.activeQuestion!.targetFieldId)!.category!, gameState.questionHistory, langForTiebreaker, 'hard');
-                     setIsProcessingQuestion(false);
-                     dispatch({ type: 'RESOLVE_TURN', payload: { tieBreakerQuestion: tieBreakerQuestion || undefined }});
-                } else {
-                     dispatch({ type: 'RESOLVE_TURN' });
-                }
-            } else if (gameState.activeQuestion) {
+        const triggerAction = () => {
+            if (gameState.activeQuestion) {
                  dispatch({ type: 'RESOLVE_TURN' });
             }
         };
-
+        
+        // This effect now simply waits for all answers and resolves the turn.
+        // The complex tie-breaker logic is now handled entirely in `gameLogic.ts`.
         if (gameState.activeQuestion && Object.values(gameState.activeQuestion.playerAnswers).every(ans => ans !== null)) {
             logicTimeoutRef.current = window.setTimeout(triggerAction, 1500);
         }
 
-    }, [gameState.activeQuestion, gameState.players, user.language, dispatch]);
+    }, [gameState.activeQuestion, dispatch]);
 
     React.useEffect(() => {
         if (botTurnTimeoutRef.current) clearTimeout(botTurnTimeoutRef.current);

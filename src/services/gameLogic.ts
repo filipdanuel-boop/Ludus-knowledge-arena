@@ -4,14 +4,13 @@ import { normalizeAnswer } from '../utils';
 
 
 export const createInitialGameState = (playerCount: number, user: User, isOnlineMode: boolean = false, botDifficulty?: QuestionDifficulty): GameState => {
-    const userName = user.email.split('@')[0];
     const shuffledBotNames = [...BOT_NAMES].sort(() => 0.5 - Math.random());
 
     const players: Player[] = Array.from({ length: playerCount }, (_, i) => {
         const isBot = i !== 0;
         return {
             id: `player-${i+1}`,
-            name: isBot ? (isOnlineMode ? shuffledBotNames.pop()! : `Bot ${i}`) : userName,
+            name: isBot ? (isOnlineMode ? shuffledBotNames.pop()! : `Bot ${i}`) : user.nickname,
             color: PLAYER_COLORS[i % PLAYER_COLORS.length],
             score: 0,
             coins: i === 0 ? user.luduCoins : 1000,
@@ -202,16 +201,15 @@ const handleHealAction = (state: GameState) => {
     return state;
 };
 
-const handleAttackAction = (state: GameState, tieBreakerQuestion?: Question) => {
+const handleAttackAction = (state: GameState) => {
     const { attackerId, defenderId, targetFieldId, playerAnswers, question, isBaseAttack, category } = state.activeQuestion!;
     const attacker = state.players.find(p => p.id === attackerId)!;
     const field = state.board.find(f => f.id === targetFieldId)!;
     
-    // Update bot used categories
     if (attacker.isBot && !isBaseAttack) {
         let availableCategories = CATEGORIES.filter(c => !attacker.usedAttackCategories.includes(c));
         if (availableCategories.length === 0) {
-            attacker.usedAttackCategories = [category]; // Reset and add current
+            attacker.usedAttackCategories = [category];
         } else {
             attacker.usedAttackCategories.push(category);
         }
@@ -225,24 +223,9 @@ const handleAttackAction = (state: GameState, tieBreakerQuestion?: Question) => 
         if(!attacker.isBot && isAttackerCorrect) state.matchStats[attacker.id].xpEarned += XP_PER_CORRECT_ANSWER * XP_DIFFICULTY_MULTIPLIER[question.difficulty];
         if(!defender.isBot && isDefenderCorrect) state.matchStats[defender.id].xpEarned += XP_PER_CORRECT_ANSWER * XP_DIFFICULTY_MULTIPLIER[question.difficulty];
 
-        if (isAttackerCorrect && isDefenderCorrect && !isBaseAttack && !state.activeQuestion!.isTieBreaker) {
-            if (tieBreakerQuestion) {
-                 state.activeQuestion = {
-                    ...state.activeQuestion!,
-                    question: tieBreakerQuestion,
-                    questionType: 'OPEN_ENDED',
-                    isTieBreaker: true,
-                    playerAnswers: { [attackerId]: null, [defenderId]: null },
-                    startTime: Date.now(),
-                 };
-                 state.questionHistory.push(tieBreakerQuestion.question);
-                 state.gameLog.push(`ROZSTŘEL mezi ${attacker.name} a ${defender.name}!`);
-                 return state;
-            } else {
-                // No tiebreaker question available, defense holds. No score change.
-                state.gameLog.push(`${defender.name} ubránil své území v napínavém souboji!`);
-            }
-        } else if (isAttackerCorrect) { // Attacker wins (includes base attack where defender was also correct)
+        if (isAttackerCorrect && isDefenderCorrect) {
+            state.gameLog.push(`${defender.name} ubránil své území v napínavém souboji!`);
+        } else if (isAttackerCorrect) { // Attacker wins
             field.hp -= 1;
             if (isBaseAttack) {
                 attacker.score += POINTS.ATTACK_DAMAGE;
@@ -352,7 +335,7 @@ const advanceTurnAndRound = (state: GameState): GameState => {
     return state;
 };
 
-const resolveTurn = (state: GameState, tieBreakerQuestion?: Question): GameState => {
+const resolveTurn = (state: GameState): GameState => {
     let newState = JSON.parse(JSON.stringify(state)) as GameState;
     if (!newState.activeQuestion) return newState;
 
@@ -361,8 +344,7 @@ const resolveTurn = (state: GameState, tieBreakerQuestion?: Question): GameState
     if (actionType === 'HEAL') {
         newState = handleHealAction(newState);
     } else if (actionType === 'ATTACK') {
-        newState = handleAttackAction(newState, tieBreakerQuestion);
-        if(newState.activeQuestion?.isTieBreaker) return newState;
+        newState = handleAttackAction(newState);
     }
 
     newState = checkForEliminations(newState);
@@ -491,7 +473,7 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
 
         case 'RESOLVE_TURN':
             if (!state) return null;
-            return resolveTurn(state, action.payload?.tieBreakerQuestion);
+            return resolveTurn(state);
             
         case 'CLEAR_ANSWER_FEEDBACK':
             return state ? { ...state, answerResult: null } : null;

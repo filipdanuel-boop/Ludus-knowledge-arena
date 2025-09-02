@@ -30,7 +30,6 @@ export const WIN_COINS_PER_PLAYER = 50;
 export const AD_REWARD_COINS = 150;
 export const SURRENDER_COIN_PENALTY = 100;
 export const ELIMINATION_COIN_BONUS = 100;
-export const REFERRAL_BONUS_COINS = 100;
 
 
 export const BASE_HP = 3;

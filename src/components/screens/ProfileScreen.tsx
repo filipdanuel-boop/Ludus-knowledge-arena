@@ -2,13 +2,17 @@ import * as React from 'react';
 import { User, Theme, Category } from '../../types';
 import { themes } from '../../themes';
 import { NeonButton } from '../ui/NeonButton';
-import { getLevelForXp, getTotalXpForLevel, getXpProgressInLevel } from '../../utils';
+import { getXpProgressInLevel, getTotalXpForLevel } from '../../utils';
 import { CATEGORIES } from '../../constants';
 import { questionBank } from '../../services/questionBank';
+import * as userService from '../../services/userService';
 import { useTranslation } from '../../i18n/LanguageContext';
 
-export const ProfileScreen: React.FC<{ user: User; onBack: () => void; themeConfig: typeof themes[Theme] }> = ({ user, onBack, themeConfig }) => {
+export const ProfileScreen: React.FC<{ user: User; setUser: React.Dispatch<React.SetStateAction<User | null>>; onBack: () => void; themeConfig: typeof themes[Theme] }> = ({ user, setUser, onBack, themeConfig }) => {
     const { t } = useTranslation();
+    const [nickname, setNickname] = React.useState(user.nickname);
+    const [editError, setEditError] = React.useState<string | null>(null);
+    const [saveSuccess, setSaveSuccess] = React.useState(false);
     
     const { level, currentLevelXp, xpForNextLevel } = getXpProgressInLevel(user.xp);
     const progressPercentage = xpForNextLevel > 0 ? (currentLevelXp / xpForNextLevel) * 100 : 100;
@@ -20,6 +24,25 @@ export const ProfileScreen: React.FC<{ user: User; onBack: () => void; themeConf
         const oe = questionBank[category].openEnded;
         return (mc.easy.length + mc.medium.length + mc.hard.length + oe.easy.length + oe.medium.length + oe.hard.length);
     }
+
+    const handleSaveNickname = () => {
+        setEditError(null);
+        setSaveSuccess(false);
+
+        if (nickname.length < 3) {
+            setEditError(t('errorNicknameTooShort'));
+            return;
+        }
+
+        const result = userService.updateNickname(user.email, nickname);
+        if (result.success && result.user) {
+            setUser(result.user);
+            setSaveSuccess(true);
+            setTimeout(() => setSaveSuccess(false), 2000);
+        } else {
+            setEditError(t(result.message));
+        }
+    };
     
     return (
         <div className="min-h-screen p-4 sm:p-8">
@@ -28,7 +51,7 @@ export const ProfileScreen: React.FC<{ user: User; onBack: () => void; themeConf
                 
                 <div className={`bg-gray-800 p-6 rounded-lg border ${themeConfig.accentBorder} mb-8`}>
                     <div className="flex items-center justify-between mb-4">
-                        <h2 className={`text-3xl font-semibold ${themeConfig.accentTextLight}`}>{user.email.split('@')[0]}</h2>
+                        <h2 className={`text-3xl font-semibold ${themeConfig.accentTextLight}`}>{user.nickname}</h2>
                         <span className={`text-2xl font-bold bg-gray-700 px-4 py-1 rounded-lg border ${themeConfig.accentBorderSecondary}`}>{level}</span>
                     </div>
                     <div>
@@ -43,6 +66,25 @@ export const ProfileScreen: React.FC<{ user: User; onBack: () => void; themeConf
                             ></div>
                         </div>
                     </div>
+                </div>
+
+                <div className={`bg-gray-800 p-6 rounded-lg border ${themeConfig.accentBorder} mb-8`}>
+                     <h3 className={`text-2xl font-semibold ${themeConfig.accentTextLight} mb-4`}>{t('editProfile')}</h3>
+                     <div className="flex items-end gap-4">
+                        <div className="flex-grow">
+                             <label className="block text-gray-400 mb-2" htmlFor="nickname">{t('nicknameLabel')}</label>
+                             <input 
+                               type="text" 
+                               id="nickname" 
+                               value={nickname}
+                               onChange={e => setNickname(e.target.value)}
+                               className={`w-full p-3 bg-gray-700 rounded border border-gray-600 focus:outline-none focus:ring-2 ${themeConfig.accentRing}`} 
+                             />
+                        </div>
+                        <NeonButton onClick={handleSaveNickname} themeConfig={themeConfig}>{t('save')}</NeonButton>
+                     </div>
+                     {editError && <p className="text-red-500 text-sm mt-2 animate-shake">{editError}</p>}
+                     {saveSuccess && <p className="text-green-500 text-sm mt-2">{t('nicknameUpdated')}</p>}
                 </div>
 
                 <div className={`bg-gray-800 p-6 rounded-lg border ${themeConfig.accentBorder}`}>

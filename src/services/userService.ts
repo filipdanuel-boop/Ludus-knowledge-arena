@@ -29,18 +29,24 @@ const getInitialStats = () => {
     };
 };
 
-export const registerUser = (email: string, password: string, language: Language): { success: boolean, message: string, user?: User } => {
+export const registerUser = (email: string, password: string, nickname: string, language: Language): { success: boolean, message: string, user?: User } => {
     const users = getAllUsers();
     const lowerEmail = email.toLowerCase();
     
     if (users[lowerEmail]) {
         return { success: false, message: "errorUserExists" };
     }
+    
+    // Check if nickname is already taken
+    if (Object.values(users).some(u => u.nickname.toLowerCase() === nickname.toLowerCase())) {
+        return { success: false, message: "errorNicknameTaken" };
+    }
 
     const today = new Date().toISOString().split('T')[0];
     
     const newUser: User = {
         email: lowerEmail,
+        nickname: nickname,
         luduCoins: INITIAL_COINS,
         language: language,
         xp: 0,
@@ -117,6 +123,24 @@ export const addCoins = (email: string, amount: number): User | null => {
     return null;
 }
 
+export const updateNickname = (email: string, newNickname: string): { success: boolean; message: string; user?: User } => {
+    const users = getAllUsers();
+    const lowerEmail = email.toLowerCase();
+    
+    // Check if nickname is already taken by another user
+    if (Object.values(users).some(u => u.email !== lowerEmail && u.nickname.toLowerCase() === newNickname.toLowerCase())) {
+        return { success: false, message: "errorNicknameTaken" };
+    }
+
+    const user = loadUserData(email);
+    if (user) {
+        user.nickname = newNickname;
+        saveUserData(user);
+        return { success: true, message: "nicknameUpdated", user };
+    }
+    return { success: false, message: "errorUserNotFound" };
+};
+
 export const getLeaderboardData = (currentUserEmail: string): LeaderboardEntry[] => {
     const users = getAllUsers();
     const allUsers: User[] = Object.values(users).map(({ password, ...user }) => user);
@@ -125,7 +149,7 @@ export const getLeaderboardData = (currentUserEmail: string): LeaderboardEntry[]
 
     return sortedUsers.map((user, index) => ({
         rank: index + 1,
-        name: user.email.split('@')[0],
+        name: user.nickname,
         level: getLevelForXp(user.xp),
         xp: user.xp,
         isCurrentUser: user.email.toLowerCase() === currentUserEmail.toLowerCase(),

@@ -10,6 +10,7 @@ export const AuthScreen: React.FC<{ onLogin: (user: User) => void; themeConfig: 
   const [authMode, setAuthMode] = React.useState<'login' | 'register'>('login');
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
+  const [nickname, setNickname] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
 
@@ -34,6 +35,14 @@ export const AuthScreen: React.FC<{ onLogin: (user: User) => void; themeConfig: 
             setError(t(result.message));
         }
     } else { // Register mode
+        if (!nickname) {
+            setError(t('errorNicknameRequired'));
+            return;
+        }
+        if (nickname.length < 3) {
+            setError(t('errorNicknameTooShort'));
+            return;
+        }
         if (password.length < 6) {
             setError(t('errorPasswordLength'));
             return;
@@ -43,7 +52,7 @@ export const AuthScreen: React.FC<{ onLogin: (user: User) => void; themeConfig: 
             return;
         }
         
-        const result = userService.registerUser(email, password, language);
+        const result = userService.registerUser(email, password, nickname, language);
         if (result.success && result.user) {
             onLogin(result.user);
         } else {
@@ -71,6 +80,18 @@ export const AuthScreen: React.FC<{ onLogin: (user: User) => void; themeConfig: 
               className={`w-full p-3 bg-gray-700 rounded border border-gray-600 focus:outline-none focus:ring-2 ${themeConfig.accentRing}`} 
             />
           </div>
+           {authMode === 'register' && (
+            <div className="mb-4">
+              <label className="block text-gray-400 mb-2" htmlFor="nickname">{t('nicknameLabel')}</label>
+              <input 
+                type="text" 
+                id="nickname" 
+                value={nickname}
+                onChange={e => setNickname(e.target.value)}
+                className={`w-full p-3 bg-gray-700 rounded border border-gray-600 focus:outline-none focus:ring-2 ${themeConfig.accentRing}`}
+              />
+            </div>
+          )}
           <div className="mb-6">
             <label className="block text-gray-400 mb-2" htmlFor="password">{t('passwordLabel')}</label>
             <input 

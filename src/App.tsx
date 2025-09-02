@@ -56,17 +56,14 @@ const AppContent = () => {
   };
 
   React.useEffect(() => {
-    // FIX: Only attempt auto-login after the language has been set.
-    // This ensures the language selection screen is always shown first for new users.
     if (isLanguageSet) {
       const loggedInUser = userService.getLoggedInUser();
       if (loggedInUser) {
-          // Sync global language with user's saved language
           if(loggedInUser.language !== language) {
               setLanguage(loggedInUser.language);
           }
         setUser(loggedInUser);
-        setScreen('PROFILE'); // Navigate to profile on auto-login
+        setScreen('LOBBY'); // Navigate to lobby on auto-login
       }
     }
   }, [isLanguageSet, language, setLanguage]);
@@ -81,9 +78,7 @@ const AppContent = () => {
 
   React.useEffect(() => {
     localStorage.setItem('ludus_theme', theme);
-    // FIX: Simplify theme application for robustness. This replaces all existing
-    // classes on the body with the new theme's background classes, avoiding
-    // potential issues with complex class names and manual removal.
+    // Setting className directly handles both single and multi-class strings safely.
     document.body.className = themeConfig.background;
   }, [theme, themeConfig]);
 
@@ -92,7 +87,7 @@ const AppContent = () => {
     setUser(userWithCurrentLang);
     userService.saveUserData(userWithCurrentLang);
     userService.saveLoggedInUser(userWithCurrentLang.email);
-    setScreen('PROFILE'); // Navigate to profile on manual login
+    setScreen('LOBBY'); // Navigate to lobby on manual login
   };
   
   const handleLogout = () => {
@@ -125,8 +120,10 @@ const AppContent = () => {
             currentUserData.stats.totalAnswered += playerStats.total;
             
             for(const category in playerStats.categories){
-                currentUserData.stats.categoryStats[category as Category].totalCorrect += playerStats.categories[category as Category].correct;
-                currentUserData.stats.categoryStats[category as Category].totalAnswered += playerStats.categories[category as Category].total;
+                if (currentUserData.stats.categoryStats[category as Category]) {
+                    currentUserData.stats.categoryStats[category as Category].totalCorrect += playerStats.categories[category as Category].correct;
+                    currentUserData.stats.categoryStats[category as Category].totalAnswered += playerStats.categories[category as Category].total;
+                }
             }
             
             userService.saveUserData(currentUserData);
@@ -134,7 +131,7 @@ const AppContent = () => {
         }
       }
       dispatch({ type: 'SET_STATE', payload: { gamePhase: GamePhase.Setup }});
-      setScreen('LOBBY');
+      setScreen('PROFILE'); // Navigate to Profile after a game
   };
 
   const renderScreen = () => {
@@ -172,7 +169,7 @@ const AppContent = () => {
         return <RulesScreen onBack={() => setScreen('LOBBY')} themeConfig={themeConfig} />;
        case 'PROFILE':
         if (!user) return <AuthScreen onLogin={handleLogin} themeConfig={themeConfig} />;
-        return <ProfileScreen user={user} onBack={() => setScreen('LOBBY')} themeConfig={themeConfig} />;
+        return <ProfileScreen user={user} setUser={setUser} onBack={() => setScreen('LOBBY')} themeConfig={themeConfig} />;
       case 'LEADERBOARD':
         if (!user) return <AuthScreen onLogin={handleLogin} themeConfig={themeConfig} />;
         return <LeaderboardScreen user={user} onBack={() => setScreen('LOBBY')} themeConfig={themeConfig} />;
@@ -220,7 +217,7 @@ const AppContent = () => {
   );
 }
 
-export default function App() {
+export default function AppWrapper() {
     return (
         <LanguageProvider>
             <AppContent />

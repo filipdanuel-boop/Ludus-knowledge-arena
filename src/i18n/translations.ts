@@ -17,6 +17,7 @@ export const translations: Record<Language, Translations> = {
     phase: 'Fáze',
     round: 'Kolo',
     points: 'bodů',
+    save: 'Uložit',
     
     // LanguageSelectionScreen
     chooseLanguage: 'Choose your language / Vyberte si jazyk',
@@ -26,6 +27,7 @@ export const translations: Record<Language, Translations> = {
     loginTitle: 'Přihlášení',
     registerTitle: 'Registrace',
     emailLabel: 'Email',
+    nicknameLabel: 'Přezdívka',
     passwordLabel: 'Heslo',
     confirmPasswordLabel: 'Potvrdit Heslo',
     enterArenaButton: 'Vstoupit do Arény',
@@ -39,6 +41,9 @@ export const translations: Record<Language, Translations> = {
     errorIncorrectPassword: 'Nesprávné heslo.',
     errorPasswordLength: 'Heslo musí mít alespoň 6 znaků.',
     errorPasswordsMismatch: 'Hesla se neshodují.',
+    errorNicknameRequired: 'Přezdívka je povinná.',
+    errorNicknameTaken: 'Tato přezdívka je již zabraná.',
+    errorNicknameTooShort: 'Přezdívka musí mít alespoň 3 znaky.',
 
     // LobbyScreen
     changeTheme: 'Změnit téma',
@@ -136,6 +141,10 @@ export const translations: Record<Language, Translations> = {
     opponentIsAnswering: 'Soupeř odpovídá...',
     writtenAnswerPending: 'Odpověď se píše...',
     chooseTheme: 'Zvolte Vizuální Téma',
+    themeNameCyberpunk: 'Kyberpunk',
+    themeNameForest: 'Les',
+    themeNameOcean: 'Oceán',
+    themeNameInferno: 'Peklo',
     
     // ProfileScreen
     playerProfile: 'Profil Hráče',
@@ -145,6 +154,8 @@ export const translations: Record<Language, Translations> = {
     categoryProgress: 'Postup v kategoriích:',
     progressCompleted: '{0}% splněno',
     viewProfile: 'Zobrazit Profil',
+    editProfile: 'Upravit Profil',
+    nicknameUpdated: 'Přezdívka úspěšně změněna!',
     
     // LeaderboardScreen
     leaderboardTitle: 'Globální Žebříček',
@@ -166,6 +177,7 @@ export const translations: Record<Language, Translations> = {
     phase: 'Phase',
     round: 'Round',
     points: 'points',
+    save: 'Save',
 
     // LanguageSelectionScreen
     chooseLanguage: 'Choose your language / Vyberte si jazyk',
@@ -175,6 +187,7 @@ export const translations: Record<Language, Translations> = {
     loginTitle: 'Login',
     registerTitle: 'Register',
     emailLabel: 'Email',
+    nicknameLabel: 'Nickname',
     passwordLabel: 'Password',
     confirmPasswordLabel: 'Confirm Password',
     enterArenaButton: 'Enter Arena',
@@ -188,6 +201,9 @@ export const translations: Record<Language, Translations> = {
     errorIncorrectPassword: 'Incorrect password.',
     errorPasswordLength: 'Password must be at least 6 characters long.',
     errorPasswordsMismatch: 'Passwords do not match.',
+    errorNicknameRequired: 'Nickname is required.',
+    errorNicknameTaken: 'This nickname is already taken.',
+    errorNicknameTooShort: 'Nickname must be at least 3 characters long.',
     
     // LobbyScreen
     changeTheme: 'Change Theme',
@@ -285,6 +301,10 @@ export const translations: Record<Language, Translations> = {
     opponentIsAnswering: 'Opponent is answering...',
     writtenAnswerPending: 'Typing answer...',
     chooseTheme: 'Choose Visual Theme',
+    themeNameCyberpunk: 'Cyberpunk',
+    themeNameForest: 'Forest',
+    themeNameOcean: 'Ocean',
+    themeNameInferno: 'Inferno',
     
     // ProfileScreen
     playerProfile: 'Player Profile',
@@ -294,6 +314,8 @@ export const translations: Record<Language, Translations> = {
     categoryProgress: 'Category Progress:',
     progressCompleted: '{0}% completed',
     viewProfile: 'View Profile',
+    editProfile: 'Edit Profile',
+    nicknameUpdated: 'Nickname updated successfully!',
     
     // LeaderboardScreen
     leaderboardTitle: 'Global Leaderboard',
@@ -315,6 +337,7 @@ export const translations: Record<Language, Translations> = {
     phase: 'Phase',
     round: 'Runde',
     points: 'Punkte',
+    save: 'Speichern',
 
     // LanguageSelectionScreen
     chooseLanguage: 'Wähle deine Sprache / Choose your language',
@@ -324,6 +347,7 @@ export const translations: Record<Language, Translations> = {
     loginTitle: 'Anmelden',
     registerTitle: 'Registrieren',
     emailLabel: 'E-Mail',
+    nicknameLabel: 'Spitzname',
     passwordLabel: 'Passwort',
     confirmPasswordLabel: 'Passwort bestätigen',
     enterArenaButton: 'Arena betreten',
@@ -337,6 +361,9 @@ export const translations: Record<Language, Translations> = {
     errorIncorrectPassword: 'Falsches Passwort.',
     errorPasswordLength: 'Das Passwort muss mindestens 6 Zeichen lang sein.',
     errorPasswordsMismatch: 'Die Passwörter stimmen nicht überein.',
+    errorNicknameRequired: 'Spitzname ist erforderlich.',
+    errorNicknameTaken: 'Dieser Spitzname ist bereits vergeben.',
+    errorNicknameTooShort: 'Der Spitzname muss mindestens 3 Zeichen lang sein.',
     
     // LobbyScreen
     changeTheme: 'Thema ändern',
@@ -434,6 +461,10 @@ export const translations: Record<Language, Translations> = {
     opponentIsAnswering: 'Gegner antwortet...',
     writtenAnswerPending: 'Antwort wird getippt...',
     chooseTheme: 'Visuelles Thema wählen',
+    themeNameCyberpunk: 'Cyberpunk',
+    themeNameForest: 'Wald',
+    themeNameOcean: 'Ozean',
+    themeNameInferno: 'Inferno',
 
     // ProfileScreen
     playerProfile: 'Spielerprofil',
@@ -443,6 +474,8 @@ export const translations: Record<Language, Translations> = {
     categoryProgress: 'Kategoriefortschritt:',
     progressCompleted: '{0}% abgeschlossen',
     viewProfile: 'Profil ansehen',
+    editProfile: 'Profil bearbeiten',
+    nicknameUpdated: 'Spitzname erfolgreich aktualisiert!',
 
     // LeaderboardScreen
     leaderboardTitle: 'Globale Bestenliste',
@@ -464,6 +497,7 @@ export const translations: Record<Language, Translations> = {
     phase: 'Fase',
     round: 'Ronda',
     points: 'puntos',
+    save: 'Guardar',
 
     // LanguageSelectionScreen
     chooseLanguage: 'Elige tu idioma / Choose your language',
@@ -473,6 +507,7 @@ export const translations: Record<Language, Translations> = {
     loginTitle: 'Iniciar sesión',
     registerTitle: 'Registrarse',
     emailLabel: 'Correo electrónico',
+    nicknameLabel: 'Apodo',
     passwordLabel: 'Contraseña',
     confirmPasswordLabel: 'Confirmar contraseña',
     enterArenaButton: 'Entrar a la Arena',
@@ -486,6 +521,9 @@ export const translations: Record<Language, Translations> = {
     errorIncorrectPassword: 'Contraseña incorrecta.',
     errorPasswordLength: 'La contraseña debe tener al menos 6 caracteres.',
     errorPasswordsMismatch: 'Las contraseñas no coinciden.',
+    errorNicknameRequired: 'Se requiere apodo.',
+    errorNicknameTaken: 'Este apodo ya está en uso.',
+    errorNicknameTooShort: 'El apodo debe tener al menos 3 caracteres.',
     
     // LobbyScreen
     changeTheme: 'Cambiar tema',
@@ -583,6 +621,10 @@ export const translations: Record<Language, Translations> = {
     opponentIsAnswering: 'El oponente está respondiendo...',
     writtenAnswerPending: 'Escribiendo respuesta...',
     chooseTheme: 'Elegir Tema Visual',
+    themeNameCyberpunk: 'Ciberpunk',
+    themeNameForest: 'Bosque',
+    themeNameOcean: 'Océano',
+    themeNameInferno: 'Infierno',
 
     // ProfileScreen
     playerProfile: 'Perfil del Jugador',
@@ -592,6 +634,8 @@ export const translations: Record<Language, Translations> = {
     categoryProgress: 'Progreso por Categoría:',
     progressCompleted: '{0}% completado',
     viewProfile: 'Ver Perfil',
+    editProfile: 'Editar Perfil',
+    nicknameUpdated: '¡Apodo actualizado con éxito!',
 
     // LeaderboardScreen
     leaderboardTitle: 'Clasificación Global',
