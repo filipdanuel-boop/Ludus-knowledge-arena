@@ -12,7 +12,11 @@ export enum Category {
 
 export enum GamePhase {
   Setup = "SETUP",
-  Phase1_LandGrab = "PHASE_1_ZABÍRÁNÍ_ÚZEMÍ",
+  // FIX: Added new sub-phases for phase 1 to align with game logic and fix type errors.
+  Phase1_PickField = "Phase1_PickField",
+  Phase1_ShowQuestion = "Phase1_ShowQuestion",
+  Phase1_SelectionResolved = "Phase1_SelectionResolved",
+  Phase1_RoundEnd = "Phase1_RoundEnd",
   Phase2_Attacks = "PHASE_2_ÚTOKY",
   Phase3_FinalShowdown = "PHASE_3_FINÁLE",
   GameOver = "GAME_OVER",
@@ -137,11 +141,13 @@ export type GameAction =
   | { type: 'CLEAR_QUESTION' }
   | { type: 'SUBMIT_ANSWER'; payload: { playerId: string; answer: string; category: Category } }
   | { type: 'RESOLVE_PHASE1_ROUND'; payload: { humanActionResult: 'win' | 'loss', fieldId: number } }
-  | { type: 'RESOLVE_TURN' }
+  | { type: 'RESOLVE_TURN'; payload?: { tieBreakerQuestion?: Question } }
   | { type: 'SET_ANSWER_FEEDBACK'; payload: GameState['answerResult'] }
   | { type: 'CLEAR_ANSWER_FEEDBACK' }
   | { type: 'SET_ELIMINATION_FEEDBACK'; payload: GameState['eliminationResult'] }
   | { type: 'CLEAR_ELIMINATION_FEEDBACK' }
   | { type: 'UPDATE_PLAYERS'; payload: Player[] }
   | { type: 'PASS_BOT_TURN'; payload: { botId: string; reason: string } }
-  | { type: 'SET_STATE'; payload: Partial<GameState> };
+  | { type: 'SET_STATE'; payload: Partial<GameState> }
+  // FIX: Added 'AUTO_SELECT_FIELD' action type to support game logic.
+  | { type: 'AUTO_SELECT_FIELD' };
