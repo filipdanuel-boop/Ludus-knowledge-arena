@@ -40,20 +40,22 @@ export const PhaseTimerUI: React.FC<PhaseTimerUIProps> = ({ phase, startTime, du
     const allowClicksThrough = phase === GamePhase.Phase1_PickField;
 
     return (
-        // Wrapper positions content but does not interact with mouse events itself.
-        <div className="fixed inset-0 flex flex-col items-center justify-center z-40 pointer-events-none">
-            {/* Background overlay. Its interactivity is explicitly controlled. */}
+        // This root container is now just for positioning and has no pointer-events logic itself.
+        <div className="fixed inset-0 z-40">
+            {/* The overlay is a dedicated layer that explicitly controls click blocking. */}
             <div 
-                className={`absolute inset-0 bg-black/70 animate-fade-in ${allowClicksThrough ? 'pointer-events-none' : 'pointer-events-auto'}`} 
+                className={`absolute inset-0 bg-black/70 animate-fade-in ${allowClicksThrough ? 'pointer-events-none' : 'pointer-events-auto'}`}
             />
-
-            {/* Content is rendered on top of the background, but within the non-interactive wrapper. */}
-            <div className="relative animate-fade-in text-center">
-                <p className={`text-3xl mb-4 font-semibold ${themeConfig.accentTextLight}`}>{getTextForPhase()}</p>
-                <div className="text-8xl font-bold text-white">
-                    {Math.ceil(timeLeft)}
+            
+            {/* The text content is in a separate container that is always transparent to clicks. */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                 <div className="relative animate-fade-in text-center">
+                    <p className={`text-3xl mb-4 font-semibold ${themeConfig.accentTextLight}`}>{getTextForPhase()}</p>
+                    <div className="text-8xl font-bold text-white">
+                        {Math.ceil(timeLeft)}
+                    </div>
+                    {timeLeft <= 3 && timeLeft > 0 && <p className="text-xl mt-4 font-semibold text-red-500 animate-pulse">{t('timeUp')}</p>}
                 </div>
-                {timeLeft <= 3 && timeLeft > 0 && <p className="text-xl mt-4 font-semibold text-red-500 animate-pulse">{t('timeUp')}</p>}
             </div>
         </div>
     );

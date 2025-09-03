@@ -101,16 +101,18 @@ export const getAttackers = (players: Player[]): Player[] => {
     return sortedPlayers.slice(0, attackerCount);
 };
 
+// --- Bot Decision Making ---
 export const decideBotAction = (gameState: GameState): { action: 'HEAL' | 'ATTACK' | 'PASS', targetField?: Field, category?: Category, reason?: string, difficulty?: QuestionDifficulty } => {
     const bot = gameState.players[gameState.currentTurnPlayerIndex];
     const difficulty = gameState.botDifficulty;
 
+    // --- EASY BOT ---
     if (difficulty === 'easy') {
         const botBase = gameState.board.find(f => f.ownerId === bot.id && f.type === 'PLAYER_BASE');
         if (botBase && botBase.hp < botBase.maxHp && Math.random() < 0.25) {
             return { action: 'HEAL', targetField: botBase, category: botBase.category!, difficulty: 'easy' };
         }
-        const validTargets = gameState.board.filter(f => f.ownerId !== null && f.ownerId !== bot.id && f.type !== 'NEUTRAL');
+        const validTargets = gameState.board.filter(f => (f.ownerId !== null && f.ownerId !== bot.id) || f.type === 'BLACK');
         if (validTargets.length === 0) {
             return { action: 'PASS', reason: "No valid targets found." };
         }
@@ -132,28 +134,31 @@ export const decideBotAction = (gameState: GameState): { action: 'HEAL' | 'ATTAC
         return { action: 'ATTACK', targetField, category, difficulty: questionDifficulty };
     }
 
+    // --- MEDIUM & HARD BOTS ---
     const possibleActions: { score: number; action: 'HEAL' | 'ATTACK'; targetField: Field }[] = [];
     const botBase = gameState.board.find(f => f.ownerId === bot.id && f.type === 'PLAYER_BASE')!;
 
+    // 1. Calculate score for healing
     if (botBase.hp < botBase.maxHp) {
-        let healScore = (botBase.maxHp - botBase.hp) * 30;
-        if (botBase.hp === 1) healScore += 70;
+        let healScore = (botBase.maxHp - botBase.hp) * 30; // e.g., 1 missing HP = 30 points
+        if (botBase.hp === 1) healScore += 70; // high priority if base is at 1 HP
         possibleActions.push({ score: healScore, action: 'HEAL', targetField: botBase });
     }
 
-    const potentialTargets = gameState.board.filter(f => f.ownerId !== null && f.ownerId !== bot.id);
+    // 2. Calculate scores for all possible attack targets
+    const potentialTargets = gameState.board.filter(f => (f.ownerId !== null && f.ownerId !== bot.id) || f.type === 'BLACK');
     const highestScore = Math.max(...gameState.players.filter(p => !p.isEliminated).map(p => p.score));
 
     for (const targetField of potentialTargets) {
-        let attackScore = 10;
+        let attackScore = 10; // base score for any attack
         const targetPlayer = gameState.players.find(p => p.id === targetField.ownerId);
 
         if (targetField.type === 'PLAYER_BASE') {
-            attackScore += 60;
-            attackScore += (targetField.maxHp - targetField.hp) * 25;
+            attackScore += 60; // high priority for base attack
+            attackScore += (targetField.maxHp - targetField.hp) * 25; // prioritize damaged bases
         } else if (targetField.type === 'BLACK') {
-            attackScore += 5;
-        } else {
+            attackScore += 5; // low priority for black fields
+        } else { // Normal player-owned field
             attackScore += 15;
         }
 
@@ -161,22 +166,24 @@ export const decideBotAction = (gameState: GameState): { action: 'HEAL' | 'ATTAC
             attackScore += (highestScore - targetPlayer.score) / 50;
             const territoryCount = gameState.board.filter(f => f.ownerId === targetPlayer.id).length;
             attackScore += (10 - territoryCount) * 3;
-            if (!targetPlayer.isBot) attackScore *= 1.1;
+            if (!targetPlayer.isBot) attackScore *= 1.1; // Prioritize human player
         }
         possibleActions.push({ score: attackScore, action: 'ATTACK', targetField });
     }
 
+    // 3. Choose action based on scores and difficulty
     if (possibleActions.length === 0) {
         return { action: 'PASS', reason: "No valid actions found." };
     }
 
-    possibleActions.sort((a, b) => b.score - a.score);
+    possibleActions.sort((a, b) => b.score - a.score); // sort descending by score
 
-    let chosenAction = possibleActions[0];
-    if (difficulty === 'medium' && Math.random() > 0.65) {
+    let chosenAction = possibleActions[0]; // Default to best action for hard bot
+    if (difficulty === 'medium' && Math.random() > 0.65) { // 35% chance for medium bot to not pick the best action
         chosenAction = possibleActions[Math.floor(Math.random() * possibleActions.length)];
     }
 
+    // 4. Determine category and question difficulty for chosen action
     const { action, targetField } = chosenAction;
     let category: Category;
     let questionDifficulty: QuestionDifficulty;
@@ -184,19 +191,19 @@ export const decideBotAction = (gameState: GameState): { action: 'HEAL' | 'ATTAC
     if (action === 'HEAL') {
         category = targetField.category!;
         questionDifficulty = 'medium';
-    } else {
+    } else { // ATTACK
+        let availableCategories = CATEGORIES.filter(c => !bot.usedAttackCategories.includes(c));
+        if (availableCategories.length === 0) {
+            availableCategories = [...CATEGORIES];
+        }
+
         if (targetField.type === 'PLAYER_BASE') {
             category = targetField.category!;
             questionDifficulty = 'hard';
         } else if (targetField.type === 'BLACK') {
-            const availableCategories = CATEGORIES.filter(c => !bot.usedAttackCategories.includes(c));
-            category = availableCategories.length > 0 ? availableCategories[Math.floor(Math.random() * availableCategories.length)] : CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
+            category = availableCategories[Math.floor(Math.random() * availableCategories.length)];
             questionDifficulty = 'medium';
-        } else {
-            let availableCategories = CATEGORIES.filter(c => !bot.usedAttackCategories.includes(c));
-            if (availableCategories.length === 0) {
-                availableCategories = [...CATEGORIES];
-            }
+        } else { // Normal field
             category = availableCategories[Math.floor(Math.random() * availableCategories.length)];
             questionDifficulty = 'easy';
         }
@@ -300,13 +307,17 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
             const newState = JSON.parse(JSON.stringify(state));
             const attacker = newState.players.find((p: Player) => p.id === attackerId);
 
-            if (attacker && actionType === 'ATTACK' && !isBaseAttack && category) {
-                if (!attacker.usedAttackCategories.includes(category)) {
-                    attacker.usedAttackCategories.push(category);
+            // CRITICAL FIX for category usage cycle.
+            if (attacker && actionType === 'ATTACK' && !isBaseAttack) {
+                let used = [...attacker.usedAttackCategories];
+                // If a new cycle starts (player chose from a full list of options), reset their used list first.
+                if (used.length === CATEGORIES.length) {
+                    used = [];
                 }
-                if (attacker.usedAttackCategories.length === CATEGORIES.length) {
-                    attacker.usedAttackCategories = [];
+                if (!used.includes(category)) {
+                    used.push(category);
                 }
+                attacker.usedAttackCategories = used;
             }
             
             newState.questionHistory.push(question.question);
@@ -413,17 +424,24 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
                         attacker.score += POINTS.ATTACK_LOSS_ATTACKER;
                         newState.gameLog.push(`Útok hráče ${attacker.name} se nezdařil, oba odpověděli špatně.`);
                     }
-                } else {
-                    if (isAttackerCorrect) {
-                        field.ownerId = attackerId;
-                        field.type = FieldType.Neutral;
-                        field.hp = field.maxHp;
-                        attacker.score += field.type === FieldType.Black ? POINTS.BLACK_FIELD_CLAIM : POINTS.PHASE1_CLAIM;
-                        newState.gameLog.push(`${attacker.name} zabral území!`);
-                    } else {
-                        attacker.score += field.type === FieldType.Black ? POINTS.BLACK_FIELD_FAIL : POINTS.ATTACK_LOSS_ATTACKER;
-                        newState.gameLog.push(`${attacker.name} neuspěl na území.`);
-                    }
+                } else { // This handles Phase 1 land grab
+                    newState.players.forEach((player: Player) => {
+                         const fieldToUpdateId = newState.phase1Selections[player.id];
+                         if (fieldToUpdateId === null || fieldToUpdateId === undefined) return;
+
+                         const fieldToUpdate = newState.board.find((f: Field) => f.id === fieldToUpdateId)!;
+                         const playerAnswer = playerAnswers[player.id];
+                         const wasCorrect = normalizeAnswer(playerAnswer || '') === normalizeAnswer(question.correctAnswer);
+
+                         if (wasCorrect) {
+                             fieldToUpdate.ownerId = player.id;
+                             player.score += POINTS.PHASE1_CLAIM;
+                             newState.gameLog.push(`${player.name} zabral pole.`);
+                         } else {
+                             fieldToUpdate.type = FieldType.Black;
+                             newState.gameLog.push(`${player.name} neuspěl, pole zčernalo.`);
+                         }
+                    });
                 }
             }
 

@@ -21,6 +21,9 @@ import { EliminationFeedbackModal } from '../game/EliminationFeedbackModal';
 import { Spinner } from '../ui/Spinner';
 import { PhaseTimerUI } from '../game/PhaseTimerUI';
 import { PhaseTransitionScreen } from '../game/PhaseTransitionScreen';
+// FIX: GameEventNotification import was missing due to previous refactoring errors.
+import { GameEventNotification } from '../ui/GameEventNotification';
+
 
 interface GameScreenProps {
     gameState: GameState;
@@ -37,6 +40,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
     const [attackTarget, setAttackTarget] = React.useState<{ targetFieldId: number; defenderId?: string; isBaseAttack: boolean; } | null>(null);
     const [gameTime, setGameTime] = React.useState(0);
     const [boardRotation, setBoardRotation] = React.useState(0);
+    // State for showing contextual notifications
+    const [eventNotification, setEventNotification] = React.useState<{type: 'info' | 'success' | 'warning' | 'danger', message: string} | null>(null);
     
     const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
     if (!currentPlayer) {
@@ -97,6 +102,9 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
     
             // Attack Actions
             if (field.type === 'BLACK' || (field.ownerId && field.ownerId !== currentPlayerFromState.id)) {
+                 if(field.type === 'BLACK') {
+                    setEventNotification({ type: 'success', message: t('blackFieldSuccess') });
+                }
                 setAttackTarget({ targetFieldId: fieldId, defenderId: field.ownerId || undefined, isBaseAttack: field.type === 'PLAYER_BASE' });
             }
         }
@@ -129,6 +137,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
     // This effect centralizes all state-driven game flow logic.
     React.useEffect(() => {
         const { gamePhase, activeQuestion } = gameState;
+        setEventNotification(null); // Clear notification on phase change
 
         // Phase 1: Auto-selection timeout
         if (gamePhase === GamePhase.Phase1_PickField) {
@@ -139,7 +148,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
         // Phase 1: Show question after selection resolve
         if (gamePhase === GamePhase.Phase1_ShowQuestion) {
             const timer = setTimeout(async () => {
-                // All bots make their selection instantly in the reducer now
                 const humanPlayer = gameState.players.find(p => !p.isBot)!;
                 const fieldId = gameState.phase1Selections![humanPlayer.id]!;
                 const field = gameState.board.find(f => f.id === fieldId)!;
@@ -154,7 +162,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
                     
                     dispatch({ type: 'SET_QUESTION', payload: { question, questionType: 'MULTIPLE_CHOICE', targetFieldId: fieldId, attackerId: 'system', isBaseAttack: false, isTieBreaker: false, playerAnswers: allPlayerAnswers, startTime: Date.now(), actionType: 'ATTACK', category: field.category! } });
 
-                    // Bots answer immediately
                     gameState.players.forEach(p => {
                         if (p.isBot && !p.isEliminated) {
                              dispatch({ type: 'SUBMIT_ANSWER', payload: { playerId: p.id, answer: Math.random() < BOT_SUCCESS_RATES.easy ? question.correctAnswer : 'wrong', category: field.category! } });
@@ -166,7 +173,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
         }
         
         // Phase 1 & 2: Combat Resolution
-        if (gamePhase === GamePhase.Phase2_CombatResolve || (gamePhase === 'Phase1_ResolveRound' && activeQuestion && Object.values(activeQuestion.playerAnswers).every(a => a !== null))) {
+        if (gamePhase === GamePhase.Phase2_CombatResolve || (gamePhase === GamePhase.Phase1_ResolveRound && activeQuestion && Object.values(activeQuestion.playerAnswers).every(a => a !== null))) {
             const timer = setTimeout(() => dispatch({ type: 'RESOLVE_COMBAT' }), 1500);
             return () => clearTimeout(timer);
         }
@@ -189,7 +196,13 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
                     if (question) {
                         const defender = action === 'ATTACK' ? gameState.players.find(p => p.id === targetField!.ownerId) : undefined;
                         const playerAnswers: Record<string, string | null> = { [bot.id]: null };
-                        if (defender) playerAnswers[defender.id] = null;
+                        
+                        if (defender) {
+                            playerAnswers[defender.id] = null;
+                            if (!defender.isBot && targetField?.type === 'PLAYER_BASE') {
+                                setEventNotification({type: 'danger', message: t('baseUnderAttackWarning')});
+                            }
+                        }
 
                         dispatch({ type: 'SET_QUESTION', payload: { question, questionType: 'MULTIPLE_CHOICE', targetFieldId: targetField!.id, attackerId: bot.id, defenderId: defender?.id, isBaseAttack: targetField!.type === 'PLAYER_BASE', isTieBreaker: false, playerAnswers, startTime: Date.now(), actionType: action as 'ATTACK' | 'HEAL', category: category! }});
 
@@ -207,13 +220,12 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
         
         // Phase 2: Tiebreaker question generation
         if (gamePhase === GamePhase.Phase2_Tiebreaker && !activeQuestion) {
+             setEventNotification({ type: 'info', message: t('tieBreaker') });
             const timer = setTimeout(async () => {
-                // The previous state is stored in the reducer. We just need to generate the question here.
-                 const tieBreakerQuestion = await generateOpenEndedQuestion(Category.Sport, gameState.questionHistory, user.language, 'hard'); // Category is arbitrary here, could be improved
+                 const tieBreakerQuestion = await generateOpenEndedQuestion(Category.Sport, gameState.questionHistory, user.language, 'hard');
                  if (tieBreakerQuestion) {
                     dispatch({ type: 'SET_TIEBREAKER_QUESTION', payload: { question: tieBreakerQuestion } });
                  } else {
-                    // Could not generate a tiebreaker, resolve as a draw.
                     dispatch({ type: 'RESOLVE_COMBAT' });
                  }
             }, 1500);
@@ -225,6 +237,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
             const nextPhase = gamePhase === GamePhase.TransitionToPhase1 ? GamePhase.Phase1_PickField : GamePhase.Phase2_Attacks;
             const timer = setTimeout(() => {
                 if (nextPhase === GamePhase.Phase2_Attacks) {
+                    setEventNotification({ type: 'info', message: t('phase1End') });
                     const attackers = getAttackers(gameState.players);
                     const nextPlayerIndex = attackers.length > 0 ? gameState.players.findIndex(p => p.id === attackers[0].id) : 0;
                     dispatch({ type: 'SET_STATE', payload: { gamePhase: nextPhase, currentTurnPlayerIndex: nextPlayerIndex, gameLog: [...gameState.gameLog, t('phase2StartLog')] }});
@@ -309,8 +322,16 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
         return <PhaseTransitionScreen phaseNumber={phaseInfo.number} phaseName={phaseInfo.name} themeConfig={themeConfig} />;
     }
 
+    // FIX for category usage cycle bug
+    const currentUsedCategories = currentPlayer?.usedAttackCategories || [];
+    let availableCategories = CATEGORIES.filter(c => !currentUsedCategories.includes(c));
+    if (availableCategories.length === 0 && currentUsedCategories.length > 0) {
+        availableCategories = [...CATEGORIES];
+    }
+
     return (
         <div className="min-h-screen flex flex-col">
+            {eventNotification && <GameEventNotification type={eventNotification.type} message={eventNotification.message} />}
             {gameState.gamePhase === GamePhase.GameOver && <GameOverScreen gameState={gameState} onBackToLobby={onBackToLobby} themeConfig={themeConfig} />}
             <header className={`bg-gray-800/50 p-4 border-b ${themeConfig.accentBorder}`}>
                 <div className="flex justify-between items-center">
@@ -358,7 +379,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
             {attackTarget && (
                 <CategorySelectionModal 
                     isOpen={true}
-                    availableCategories={CATEGORIES.filter(c => !currentPlayer?.usedAttackCategories.includes(c))}
+                    availableCategories={availableCategories}
                     isBaseAttack={attackTarget.isBaseAttack}
                     onSelect={(category) => {
                          if (attackTarget.isBaseAttack) {
