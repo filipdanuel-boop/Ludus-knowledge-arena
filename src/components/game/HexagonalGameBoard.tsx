@@ -1,3 +1,4 @@
+
 import * as React from 'react';
 import { Field, Player, GamePhase, FieldType, GameState, Theme } from '../../types';
 import { PLAYER_COLOR_HEX } from '../../constants';
@@ -71,8 +72,8 @@ export const HexagonalGameBoard: React.FC<HexagonalGameBoardProps> = ({ gameStat
             fill = '#000000';
             stroke = '#4b5563';
         }
-
-        if (gamePhase === GamePhase.Phase1_PickField) {
+        // FIX: Replaced Phase1_PickField with Phase1_LandGrab
+        if (gamePhase === GamePhase.Phase1_LandGrab) {
             const selectedFieldIds = Object.values(phase1Selections).filter(id => id !== null);
             isDisabled = selectedFieldIds.includes(field.id) || !!field.ownerId || field.type === FieldType.Black;
             if (!isDisabled && field.type === FieldType.Neutral) {

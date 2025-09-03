@@ -284,7 +284,7 @@ export const translations: Record<Language, Translations> = {
     // FindingMatchScreen
     findingMatch: 'Finding Match...',
     playersFoundOf: 'Players Found: {0} / {1}',
-
+    
     // RulesScreen
     rulesTitle: 'Game Rules',
     rulesDuelsTitle: 'Duels & Tie-Breakers',
@@ -309,7 +309,7 @@ export const translations: Record<Language, Translations> = {
     phaseLandGrab: 'Land Grab',
     phaseAttacks: 'Attacks',
     phaseGameOver: 'Game Over',
-    phase2StartLog: 'Phase 2: Attacks have begun!',
+    phase2StartLog: 'Phase 2: The attacks have begun!',
 
     // Modals
     correct: 'Correct!',

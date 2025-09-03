@@ -1,5 +1,6 @@
 export type Theme = 'default' | 'forest' | 'ocean' | 'inferno';
 export type Language = 'cs' | 'en' | 'de' | 'es';
+export type QuestionDifficulty = 'easy' | 'medium' | 'hard';
 
 export enum Category {
   Sport = "Sport",
@@ -12,14 +13,14 @@ export enum Category {
 
 export enum GamePhase {
   Setup = "SETUP",
-  TransitionToPhase1 = "TRANSITION_TO_PHASE_1",
-  Phase1_PickField = "Phase1_PickField",
-  Phase1_ShowQuestion = "Phase1_ShowQuestion",
-  Phase1_ResolveRound = "Phase1_ResolveRound",
-  TransitionToPhase2 = "TRANSITION_TO_PHASE_2",
+  Phase1_LandGrab = "PHASE_1_ZABÍRÁNÍ_ÚZEMÍ",
+  Phase1_PickField = "PHASE_1_PICK_FIELD", // For HexGameBoard/PhaseTimer
+  Phase1_ShowQuestion = "PHASE_1_SHOW_QUESTION", // For PhaseTimer
+  Phase1_ResolveRound = "PHASE_1_RESOLVE_ROUND", // Added for clarity
   Phase2_Attacks = "PHASE_2_ÚTOKY",
-  Phase2_CombatResolve = "Phase2_CombatResolve",
-  Phase2_Tiebreaker = "Phase2_Tiebreaker",
+  Phase2_CombatResolve = "PHASE_2_COMBAT_RESOLVE", // New state for resolving combat
+  Phase2_Tiebreaker = "PHASE_2_TIEBREAKER", // New state for tie-breaker question
+  Phase3_FinalShowdown = "PHASE_3_FINÁLE",
   GameOver = "GAME_OVER",
 }
 
@@ -54,8 +55,6 @@ export interface Field {
   maxHp: number;
 }
 
-export type QuestionDifficulty = 'easy' | 'medium' | 'hard';
-
 export interface Question {
   question: string;
   options?: string[]; // Optional for open-ended questions
@@ -83,36 +82,28 @@ export interface GameState {
     actionType: 'ATTACK' | 'HEAL';
     playerAnswers: Record<string, string | null>;
     startTime: number; // Timestamp for countdown
-    category: Category;
   } | null;
   winners: Player[] | null;
   phase1Selections?: Record<string, number | null>;
   gameStartTime: number; // Timestamp for total game duration
-  phaseStartTime?: number;
   answerResult: {
     playerId: string;
     isCorrect: boolean;
+    correctAnswer: string;
   } | null;
   eliminationResult: {
       eliminatedPlayerName: string;
       attackerName: string;
   } | null;
   questionHistory: string[]; // History of questions for the current match
-  matchStats: Record<string, {
-      correct: number;
-      total: number;
-      xpEarned: number;
-      categories: Record<Category, { correct: number, total: number }>;
-  }>;
   botDifficulty: QuestionDifficulty;
   allowedCategories: Category[];
-}
-
-export interface UserStats {
-  totalCorrect: number;
-  totalAnswered: number;
-  answeredQuestions: string[];
-  categoryStats: Record<Category, { totalCorrect: number, totalAnswered: number }>;
+  matchStats: Record<string, {
+    xpEarned: number;
+    correct: number;
+    total: number;
+    categories: Record<Category, { correct: number; total: number }>;
+  }>;
 }
 
 export interface User {
@@ -121,8 +112,13 @@ export interface User {
   luduCoins: number;
   language: Language;
   xp: number;
-  stats: UserStats;
-  lastLoginDate: string;
+  stats: {
+    totalCorrect: number;
+    totalAnswered: number;
+    answeredQuestions: string[];
+    categoryStats: Record<Category, { totalCorrect: number; totalAnswered: number }>;
+  };
+  lastLoginDate: string; // YYYY-MM-DD
   loginStreak: number;
 }
 
@@ -134,12 +130,12 @@ export interface LeaderboardEntry {
     isCurrentUser: boolean;
 }
 
-// Private Lobby types
 export interface LobbyPlayer {
-    id: string; // user email
+    id: string;
     nickname: string;
     isHost: boolean;
 }
+
 export interface PrivateLobby {
     code: string;
     hostId: string;
@@ -151,17 +147,17 @@ export interface PrivateLobby {
 
 // --- Game Reducer Actions ---
 export type GameAction =
-  | { type: 'INITIALIZE_GAME'; payload: { players: Player[]; botDifficulty: QuestionDifficulty; user: User; allowedCategories: Category[]; } }
+  | { type: 'INITIALIZE_GAME'; payload: { players: Player[]; user: User, botDifficulty: QuestionDifficulty, allowedCategories: Category[] } }
   | { type: 'SET_PHASE1_SELECTION'; payload: { playerId: string; fieldId: number } }
   | { type: 'SET_QUESTION'; payload: GameState['activeQuestion'] }
   | { type: 'SET_TIEBREAKER_QUESTION'; payload: { question: Question } }
   | { type: 'CLEAR_QUESTION' }
-  | { type: 'SUBMIT_ANSWER'; payload: { playerId: string; answer: string; category: Category } }
-  | { type: 'RESOLVE_COMBAT' }
+  | { type: 'SUBMIT_ANSWER'; payload: { playerId: string; answer: string } }
+  | { type: 'RESOLVE_COMBAT' } // New action to resolve turn logic
+  | { type: 'SET_ANSWER_FEEDBACK'; payload: GameState['answerResult'] }
   | { type: 'CLEAR_ANSWER_FEEDBACK' }
   | { type: 'SET_ELIMINATION_FEEDBACK'; payload: GameState['eliminationResult'] }
   | { type: 'CLEAR_ELIMINATION_FEEDBACK' }
   | { type: 'UPDATE_PLAYERS'; payload: Player[] }
   | { type: 'PASS_BOT_TURN'; payload: { botId: string; reason: string } }
-  | { type: 'SET_STATE'; payload: Partial<GameState> }
-  | { type: 'AUTO_SELECT_FIELD' };
+  | { type: 'SET_STATE'; payload: Partial<GameState> };
