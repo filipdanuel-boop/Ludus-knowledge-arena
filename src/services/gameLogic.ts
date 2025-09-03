@@ -1,3 +1,4 @@
+
 import { GameState, GameAction, Player, Field, GamePhase, FieldType, Category, User, Question, QuestionDifficulty } from '../types';
 import { CATEGORIES, PLAYER_COLORS, BASE_HP, FIELD_HP, BOT_NAMES, POINTS, PHASE_DURATIONS, ELIMINATION_COIN_BONUS, XP_PER_CORRECT_ANSWER, XP_DIFFICULTY_MULTIPLIER, XP_FOR_WIN } from '../constants';
 import { normalizeAnswer } from '../utils';
@@ -103,28 +104,16 @@ export const getAttackers = (players: Player[]): Player[] => {
 
 // --- Bot Decision Making Refactored ---
 
-type BotAction = { action: 'HEAL' | 'ATTACK'; targetField: Field };
-
-// Helper 1: Find all possible actions
-const getBotPossibleActions = (gameState: GameState): BotAction[] => {
-    const bot = gameState.players[gameState.currentTurnPlayerIndex];
-    const possibleActions: BotAction[] = [];
-
-    const botBase = gameState.board.find(f => f.ownerId === bot.id && f.type === 'PLAYER_BASE');
-    if (botBase && botBase.hp < botBase.maxHp) {
-        possibleActions.push({ action: 'HEAL', targetField: botBase });
-    }
-
-    const potentialTargets = gameState.board.filter(f => (f.ownerId !== null && f.ownerId !== bot.id) || f.type === 'BLACK');
-    for (const targetField of potentialTargets) {
-        possibleActions.push({ action: 'ATTACK', targetField });
-    }
-    
-    return possibleActions;
+// This is the structure for a fully defined, possible action.
+type ExecutableBotAction = { 
+    action: 'HEAL' | 'ATTACK'; 
+    targetField: Field;
+    category: Category;
+    difficulty: QuestionDifficulty;
 };
 
-// Helper 2: Score a single action for strategic evaluation
-const scoreBotAction = (botAction: BotAction, gameState: GameState): number => {
+// Helper 1: Score a single executable action for strategic evaluation
+const scoreBotAction = (botAction: ExecutableBotAction, gameState: GameState): number => {
     const { players } = gameState;
     
     if (botAction.action === 'HEAL') {
@@ -158,72 +147,100 @@ const scoreBotAction = (botAction: BotAction, gameState: GameState): number => {
     return attackScore;
 };
 
-// Helper 3: Determine category and difficulty for the chosen action
-const getActionParameters = (botAction: BotAction, bot: Player): { category: Category, difficulty: QuestionDifficulty } | null => {
-    if (botAction.action === 'HEAL') {
-        return { category: botAction.targetField.category!, difficulty: 'medium' };
+// Helper 2: Find ALL valid and executable actions for the bot
+const getAllExecutableBotActions = (gameState: GameState): ExecutableBotAction[] => {
+    const bot = gameState.players[gameState.currentTurnPlayerIndex];
+    const executableActions: ExecutableBotAction[] = [];
+
+    // Check for HEAL action
+    const botBase = gameState.board.find(f => f.ownerId === bot.id && f.type === 'PLAYER_BASE');
+    if (botBase && botBase.hp < botBase.maxHp) {
+        executableActions.push({ 
+            action: 'HEAL', 
+            targetField: botBase,
+            category: botBase.category!,
+            difficulty: 'medium'
+        });
     }
 
-    const { targetField } = botAction;
+    // Check for ATTACK actions
+    const potentialTargets = gameState.board.filter(f => (f.ownerId !== null && f.ownerId !== bot.id) || f.type === 'BLACK');
+    
     let availableCategories = CATEGORIES.filter(c => !bot.usedAttackCategories.includes(c));
-    // If all categories are used, start a new cycle. This fixes bots getting stuck.
     if (availableCategories.length === 0 && bot.usedAttackCategories.length > 0) {
+        // Reset category cycle if all have been used
         availableCategories = [...CATEGORIES];
     }
-    
-    if (availableCategories.length === 0) return null; // Can't attack if no categories exist at all
 
-    let category: Category;
-    let difficulty: QuestionDifficulty;
-
-    if (targetField.type === 'PLAYER_BASE') {
-        category = targetField.category!;
-        difficulty = 'hard';
-    } else if (targetField.type === 'BLACK') {
-        category = availableCategories[Math.floor(Math.random() * availableCategories.length)];
-        difficulty = 'medium';
-    } else { // Normal field
-        category = availableCategories[Math.floor(Math.random() * availableCategories.length)];
-        difficulty = 'easy';
-    }
-    
-    return { category, difficulty };
-};
-
-// Main AI decision function using the helpers
-export const decideBotAction = (gameState: GameState): { action: 'HEAL' | 'ATTACK' | 'PASS', targetField?: Field, category?: Category, reason?: string, difficulty?: QuestionDifficulty } => {
-    const bot = gameState.players[gameState.currentTurnPlayerIndex];
-    const difficulty = gameState.botDifficulty;
-
-    const possibleActions = getBotPossibleActions(gameState);
-    if (possibleActions.length === 0) {
-        return { action: 'PASS', reason: "No valid actions." };
-    }
-    
-    let chosenAction: BotAction;
-
-    if (difficulty === 'easy') {
-        chosenAction = possibleActions[Math.floor(Math.random() * possibleActions.length)];
-    } else {
-        const scoredActions = possibleActions.map(act => ({ ...act, score: scoreBotAction(act, gameState) }));
-        scoredActions.sort((a, b) => b.score - a.score);
-
-        chosenAction = scoredActions[0]; // Hard bot always picks the best action
-        if (difficulty === 'medium' && Math.random() > 0.65) { // 35% chance to be suboptimal
-             chosenAction = scoredActions[Math.floor(Math.random() * scoredActions.length)];
+    for (const targetField of potentialTargets) {
+        if (targetField.type === 'PLAYER_BASE') {
+            executableActions.push({
+                action: 'ATTACK',
+                targetField,
+                category: targetField.category!,
+                difficulty: 'hard'
+            });
+        } else if (targetField.type === 'BLACK') {
+            // Can attack a black field with any available category
+            if (availableCategories.length > 0) {
+                // For scoring purposes, it's better to add one action with a random category
+                // than to add an action for EACH category, which would skew the scoring.
+                const randomCategory = availableCategories[Math.floor(Math.random() * availableCategories.length)];
+                executableActions.push({
+                    action: 'ATTACK',
+                    targetField,
+                    category: randomCategory,
+                    difficulty: 'medium'
+                });
+            }
+        } else { // Normal opponent field
+            // A normal attack is only possible if categories are available
+            if (availableCategories.length > 0) {
+                 const randomCategory = availableCategories[Math.floor(Math.random() * availableCategories.length)];
+                 executableActions.push({
+                    action: 'ATTACK',
+                    targetField,
+                    category: randomCategory,
+                    difficulty: 'easy'
+                });
+            }
         }
     }
     
-    const params = getActionParameters(chosenAction, bot);
-    if (!params) {
-        return { action: 'PASS', reason: "No available attack categories." };
+    return executableActions;
+};
+
+
+// Main AI decision function - now simpler and more robust
+export const decideBotAction = (gameState: GameState): { action: 'HEAL' | 'ATTACK' | 'PASS', targetField?: Field, category?: Category, reason?: string, difficulty?: QuestionDifficulty } => {
+    const difficulty = gameState.botDifficulty;
+    const executableActions = getAllExecutableBotActions(gameState);
+    
+    if (executableActions.length === 0) {
+        return { action: 'PASS', reason: "No valid actions." };
+    }
+    
+    let chosenAction: ExecutableBotAction;
+
+    if (difficulty === 'easy') {
+        chosenAction = executableActions[Math.floor(Math.random() * executableActions.length)];
+    } else {
+        const scoredActions = executableActions.map(act => ({ ...act, score: scoreBotAction(act, gameState) }));
+        scoredActions.sort((a, b) => b.score - a.score);
+
+        chosenAction = scoredActions[0]; // Hard bot always picks the best action
+        if (difficulty === 'medium' && Math.random() > 0.65 && scoredActions.length > 1) { // 35% chance to be suboptimal
+             const randomIndex = Math.floor(Math.random() * scoredActions.length);
+             chosenAction = scoredActions[randomIndex];
+        }
     }
 
+    // Since we picked from executable actions, we know params are valid.
     return { 
         action: chosenAction.action, 
         targetField: chosenAction.targetField, 
-        category: params.category, 
-        difficulty: params.difficulty 
+        category: chosenAction.category, 
+        difficulty: chosenAction.difficulty 
     };
 };
 
