@@ -27,7 +27,6 @@ export const LANGUAGES: { code: 'cs' | 'en' | 'de' | 'es'; name: string }[] = [
 
 export const INITIAL_COINS = 1000;
 export const WIN_COINS_PER_PLAYER = 50;
-export const AD_REWARD_COINS = 150;
 export const SURRENDER_COIN_PENALTY = 100;
 export const ELIMINATION_COIN_BONUS = 100;
 

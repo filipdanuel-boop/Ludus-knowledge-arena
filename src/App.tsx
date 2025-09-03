@@ -1,11 +1,12 @@
 import * as React from 'react';
 import { Analytics } from '@vercel/analytics/react';
 // FIX: Import 'Category' type to resolve 'Cannot find name' errors.
-import { User, Theme, GamePhase, Language, QuestionDifficulty, Category } from './types';
+import { User, Theme, GamePhase, Language, QuestionDifficulty, Category, Player } from './types';
+// FIX: Import constants to resolve 'Cannot find name' errors.
+import { BOT_NAMES, CATEGORIES } from './constants';
 import { gameReducer } from './services/gameLogic';
 import { themes } from './themes';
 import * as userService from './services/userService';
-import { AD_REWARD_COINS } from './constants';
 import { LanguageProvider, useTranslation } from './i18n/LanguageContext';
 
 // Import screen components
@@ -19,14 +20,14 @@ import { GameScreen } from './components/screens/GameScreen';
 import { ProfileScreen } from './components/screens/ProfileScreen';
 import { LanguageSelectionScreen } from './components/screens/LanguageSelectionScreen';
 import { LeaderboardScreen } from './components/screens/LeaderboardScreen';
+import { PrivateLobbyScreen } from './components/screens/PrivateLobbyScreen';
 
 
 // Import UI components
-import { AdRewardModal } from './components/game/AdRewardModal';
 import { ThemeSelectionModal } from './components/game/ThemeSelectionModal';
 import { Spinner } from './components/ui/Spinner';
 
-type Screen = 'AUTH' | 'LOBBY' | 'ONLINE_LOBBY' | 'FINDING_MATCH' | 'GAME_SETUP' | 'RULES' | 'GAME' | 'PROFILE' | 'LEADERBOARD';
+type Screen = 'AUTH' | 'LOBBY' | 'ONLINE_LOBBY' | 'FINDING_MATCH' | 'GAME_SETUP' | 'RULES' | 'GAME' | 'PROFILE' | 'LEADERBOARD' | 'PRIVATE_LOBBY';
 
 // FIX: Hardcode metadata to resolve persistent module loading error
 const appMetadata = {
@@ -41,7 +42,6 @@ const AppContent = () => {
 
   const [screen, setScreen] = React.useState<Screen>('AUTH');
   const [user, setUser] = React.useState<User | null>(null);
-  const [isAdModalOpen, setIsAdModalOpen] = React.useState(false);
   const [isThemeModalOpen, setIsThemeModalOpen] = React.useState(false);
   const [onlinePlayerCount, setOnlinePlayerCount] = React.useState(2);
   const [theme, setTheme] = React.useState<Theme>(() => (localStorage.getItem('ludus_theme') as Theme) || 'default');
@@ -55,42 +55,28 @@ const AppContent = () => {
     setIsLanguageSet(true);
   };
 
-  // This effect handles the initial user load and language synchronization.
   React.useEffect(() => {
-    // Only run this logic once the initial language has been determined.
     if (!isLanguageSet) return;
-
-    // If there's no user in the state yet, try to load one from storage.
     if (!user) {
         const loggedInUser = userService.getLoggedInUser();
         if (loggedInUser) {
-            // A user was found in storage.
-            // Update the app state with this user.
             setUser(loggedInUser);
-            // Sync the language context to match the user's saved language.
             setLanguage(loggedInUser.language);
-            // Navigate to the lobby.
             setScreen('LOBBY');
         } else {
-            // No user in storage, stay on the Auth screen.
             setScreen('AUTH');
         }
     } else {
-        // If a user is already in the state, ensure their language preference
-        // is kept in sync with the language context (e.g., if changed via dropdown).
         if (user.language !== language) {
             const updatedUser = { ...user, language };
             setUser(updatedUser);
             userService.saveUserData(updatedUser);
         }
     }
-  // This hook is designed to react to changes in `isLanguageSet`, `user`, and `language`.
-  // It ensures smooth initial loading and consistent state synchronization.
   }, [isLanguageSet, user, language, setLanguage]);
 
   React.useEffect(() => {
     localStorage.setItem('ludus_theme', theme);
-    // Setting className directly handles both single and multi-class strings safely.
     document.body.className = themeConfig.background;
   }, [theme, themeConfig]);
 
@@ -99,7 +85,7 @@ const AppContent = () => {
     setUser(userWithCurrentLang);
     userService.saveUserData(userWithCurrentLang);
     userService.saveLoggedInUser(userWithCurrentLang.email);
-    setScreen('LOBBY'); // Navigate to lobby on manual login
+    setScreen('LOBBY');
   };
   
   const handleLogout = () => {
@@ -110,9 +96,23 @@ const AppContent = () => {
 
   const handleStartGame = (playerCount: number, botDifficulty: QuestionDifficulty) => {
     if (user) {
-        dispatch({ type: 'INITIALIZE_GAME', payload: { playerCount, user, botDifficulty } });
+        // This is a bit of a hack to create players for local game.
+        const players: Player[] = Array.from({ length: playerCount }, (_, i) => ({
+            id: i === 0 ? user.email : `bot-${i}`,
+            name: i === 0 ? user.nickname : `Bot ${i}`,
+            isBot: i !== 0,
+            color: '', score: 0, coins: 0, mainBaseCategory: Category.Sport, usedAttackCategories: [], finalPoints: 0, isEliminated: false // dummy values
+        }));
+        dispatch({ type: 'INITIALIZE_GAME', payload: { players, user, botDifficulty, allowedCategories: CATEGORIES } });
         setScreen('GAME');
     }
+  };
+
+  const handleStartPrivateGame = (players: Player[], allowedCategories: Category[]) => {
+      if (user) {
+          dispatch({ type: 'INITIALIZE_GAME', payload: { players, user, botDifficulty: 'medium', allowedCategories } });
+          setScreen('GAME');
+      }
   };
 
   const handleStartOnlineGame = (playerCount: number) => {
@@ -122,7 +122,7 @@ const AppContent = () => {
 
   const handleBackToLobby = () => {
       if (gameState?.players && user) {
-        const humanPlayer = gameState.players.find(p => !p.isBot);
+        const humanPlayer = gameState.players.find(p => p.id === user.email);
         if(humanPlayer && gameState.matchStats[humanPlayer.id]) {
             const currentUserData = userService.loadUserData(user.email);
             
@@ -141,17 +141,14 @@ const AppContent = () => {
                 
                 userService.saveUserData(currentUserData);
                 setUser(currentUserData);
-            } else {
-                console.error(`Failed to load user data for ${user.email} after match.`);
             }
         }
       }
       dispatch({ type: 'SET_STATE', payload: { gamePhase: GamePhase.Setup }});
-      setScreen('PROFILE'); // Navigate to Profile after a game
+      setScreen('PROFILE');
   };
 
   const renderScreen = () => {
-    // Wait until language and user are settled before rendering anything
     if (!isLanguageSet || (isLanguageSet && screen !== 'AUTH' && !user)) {
         return <div className="min-h-screen flex items-center justify-center"><Spinner themeConfig={themeConfig} /></div>;
     }
@@ -164,7 +161,6 @@ const AppContent = () => {
             user={user!} 
             setUser={setUser}
             onNavigate={(s) => setScreen(s as Screen)} 
-            onGetFreeCoins={() => setIsAdModalOpen(true)} 
             onOpenThemeSelector={() => setIsThemeModalOpen(true)} 
             onLogout={handleLogout}
             appMetadata={appMetadata} 
@@ -177,7 +173,14 @@ const AppContent = () => {
             playerCount={onlinePlayerCount} 
             onMatchFound={() => {
                 if(user) {
-                    dispatch({ type: 'INITIALIZE_GAME', payload: { playerCount: onlinePlayerCount, user, isOnlineMode: true, botDifficulty: 'medium' } });
+                    const players: Player[] = Array.from({ length: onlinePlayerCount }, (_, i) => ({
+                        id: i === 0 ? user.email : `bot-${i}`,
+                        name: i === 0 ? user.nickname : BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)],
+                        isBot: i !== 0,
+                         color: '', score: 0, coins: 0, mainBaseCategory: Category.Sport, usedAttackCategories: [], finalPoints: 0, isEliminated: false
+                    }));
+                    // FIX: Removed 'isOnlineMode' as it's not a valid property in the dispatch payload.
+                    dispatch({ type: 'INITIALIZE_GAME', payload: { players, user, botDifficulty: 'medium', allowedCategories: CATEGORIES } });
                     setScreen('GAME');
                 }
             }} 
@@ -185,6 +188,8 @@ const AppContent = () => {
           />;
       case 'GAME_SETUP':
         return <GameSetupScreen onStartGame={handleStartGame} onBack={() => setScreen('LOBBY')} themeConfig={themeConfig}/>;
+      case 'PRIVATE_LOBBY':
+        return <PrivateLobbyScreen user={user!} onStartGame={handleStartPrivateGame} onBack={() => setScreen('LOBBY')} themeConfig={themeConfig} />;
       case 'RULES':
         return <RulesScreen onBack={() => setScreen('LOBBY')} themeConfig={themeConfig} />;
        case 'PROFILE':
@@ -224,13 +229,6 @@ const AppContent = () => {
             }}
             themes={themes}
         />}
-        {isAdModalOpen && <AdRewardModal onClaim={() => {
-            if(user) {
-                const updatedUser = userService.addCoins(user.email, AD_REWARD_COINS);
-                if(updatedUser) setUser(updatedUser);
-            }
-            setIsAdModalOpen(false);
-        }} themeConfig={themeConfig} />}
     </div>
   );
 }

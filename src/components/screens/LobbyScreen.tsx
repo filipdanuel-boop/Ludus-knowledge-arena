@@ -14,12 +14,11 @@ export const LobbyScreen: React.FC<{
     user: User;
     setUser: React.Dispatch<React.SetStateAction<User | null>>;
     onNavigate: (screen: string) => void; 
-    onGetFreeCoins: () => void; 
     onOpenThemeSelector: () => void;
     onLogout: () => void;
     appMetadata: { name: string, description: string } | null;
     themeConfig: typeof themes[Theme];
-}> = ({ user, setUser, onNavigate, onGetFreeCoins, onOpenThemeSelector, onLogout, appMetadata, themeConfig }) => {
+}> = ({ user, setUser, onNavigate, onOpenThemeSelector, onLogout, appMetadata, themeConfig }) => {
     const { t, language, setLanguage } = useTranslation();
     const [introText, setIntroText] = React.useState<string | null>(null);
     const [reward, setReward] = React.useState<number | null>(null);
@@ -45,12 +44,7 @@ export const LobbyScreen: React.FC<{
             const newStreak = user.lastLoginDate === yesterdayStr ? user.loginStreak + 1 : 1;
             const rewardAmount = newStreak % 7 === 0 ? WEEKLY_REWARD_COINS : DAILY_REWARD_COINS;
 
-            const updatedUser: User = {
-                ...user,
-                luduCoins: user.luduCoins + rewardAmount,
-                lastLoginDate: today,
-                loginStreak: newStreak,
-            };
+            const updatedUser: User = { ...user, luduCoins: user.luduCoins + rewardAmount, lastLoginDate: today, loginStreak: newStreak };
             userService.saveUserData(updatedUser);
             setUser(updatedUser);
             setReward(rewardAmount);
@@ -65,7 +59,7 @@ export const LobbyScreen: React.FC<{
     return (
         <div className="min-h-screen flex flex-col items-center justify-center p-4">
             {reward && <RewardNotification amount={reward} onDismiss={() => setReward(null)} />}
-            <div className="absolute top-4 left-4">
+            <div className="absolute top-4 left-4 flex gap-2">
                 <button 
                     onClick={onOpenThemeSelector} 
                     className={`p-3 rounded-lg ${themeConfig.accentBorder} bg-gray-800/80 backdrop-blur-sm text-white hover:bg-gray-700 transition-colors`}
@@ -74,15 +68,23 @@ export const LobbyScreen: React.FC<{
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" /></svg>
                 </button>
+                 <button 
+                    onClick={() => onNavigate('PROFILE')}
+                    className={`p-3 rounded-lg ${themeConfig.accentBorder} bg-gray-800/80 backdrop-blur-sm text-white hover:bg-gray-700 transition-colors`}
+                    aria-label={t('playerProfile')}
+                    title={t('playerProfile')}
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>
+                </button>
             </div>
             <div className={`absolute top-4 right-4 bg-gray-800/80 backdrop-blur-sm border ${themeConfig.accentBorder} p-3 rounded-lg flex items-center gap-4`}>
-                 <button onClick={() => onNavigate('PROFILE')} className="flex flex-col text-right hover:bg-gray-700/50 p-2 rounded-md transition-colors">
+                 <div className="flex flex-col text-right">
                     <p className={`${themeConfig.accentText} font-bold`}>{user.nickname}</p>
                     <div className="flex items-center gap-2 justify-end">
                         <LuduCoin themeConfig={themeConfig} className='w-5 h-5'/>
                         <p className="text-yellow-400 text-lg font-bold">{user.luduCoins.toLocaleString()}</p>
                     </div>
-                </button>
+                </div>
                 <select value={language} onChange={handleLanguageChange} className={`bg-gray-700 border ${themeConfig.accentBorder} text-white p-2 rounded focus:outline-none focus:ring-2 ${themeConfig.accentRing}`}>
                     {LANGUAGES.map(lang => (
                         <option key={lang.code} value={lang.code}>{lang.name}</option>
@@ -106,6 +108,12 @@ export const LobbyScreen: React.FC<{
             )}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-5xl">
                 <div className="flex flex-col items-center">
+                    <NeonButton onClick={() => onNavigate('PRIVATE_LOBBY')} themeConfig={themeConfig} className="w-full h-24 text-2xl">
+                        {t('challengeFriendButton')}
+                    </NeonButton>
+                    <p className="text-gray-400 mt-2 text-center">{t('challengeFriendDescription')}</p>
+                </div>
+                <div className="flex flex-col items-center">
                     <NeonButton onClick={() => onNavigate('GAME_SETUP')} themeConfig={themeConfig} className="w-full h-24 text-2xl">
                         {t('playLocallyButton')}
                     </NeonButton>
@@ -117,23 +125,15 @@ export const LobbyScreen: React.FC<{
                     </NeonButton>
                     <p className="text-gray-400 mt-2 text-center">{t('playOnlineDescription')}</p>
                 </div>
-                <div className="flex flex-col items-center">
-                    <NeonButton onClick={() => onNavigate('LEADERBOARD')} themeConfig={themeConfig} className="w-full h-24 text-2xl">
+                 <div className="flex flex-col items-center md:col-start-2">
+                    <NeonButton onClick={() => onNavigate('LEADERBOARD')} variant="secondary" themeConfig={themeConfig} className="w-full h-24 text-2xl">
                         {t('leaderboardButton')}
                     </NeonButton>
-                    <p className="text-gray-400 mt-2 text-center">{t('leaderboardDescription')}</p>
                 </div>
-                <div className="flex flex-col items-center md:col-span-1">
-                    <NeonButton onClick={onGetFreeCoins} variant="secondary" themeConfig={themeConfig} className="w-full h-24 text-2xl">
-                        {t('getFreeCoinsButton')}
-                    </NeonButton>
-                    <p className="text-gray-400 mt-2 text-center">{t('getFreeCoinsDescription')}</p>
-                </div>
-                <div className="flex flex-col items-center md:col-span-2">
+                 <div className="flex flex-col items-center">
                     <NeonButton onClick={() => onNavigate('RULES')} variant="secondary" themeConfig={themeConfig} className="w-full h-24 text-2xl">
                         {t('rulesButton')}
                     </NeonButton>
-                    <p className="text-gray-400 mt-2 text-center">{t('rulesDescription')}</p>
                 </div>
             </div>
         </div>

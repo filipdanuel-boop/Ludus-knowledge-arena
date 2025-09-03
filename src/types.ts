@@ -105,6 +105,7 @@ export interface GameState {
       categories: Record<Category, { correct: number, total: number }>;
   }>;
   botDifficulty: QuestionDifficulty;
+  allowedCategories: Category[];
 }
 
 export interface UserStats {
@@ -133,10 +134,24 @@ export interface LeaderboardEntry {
     isCurrentUser: boolean;
 }
 
+// Private Lobby types
+export interface LobbyPlayer {
+    id: string; // user email
+    nickname: string;
+    isHost: boolean;
+}
+export interface PrivateLobby {
+    code: string;
+    hostId: string;
+    players: LobbyPlayer[];
+    allowedCategories: Category[];
+    createdAt: number;
+}
+
 
 // --- Game Reducer Actions ---
 export type GameAction =
-  | { type: 'INITIALIZE_GAME'; payload: { playerCount: number; user: User, isOnlineMode?: boolean, botDifficulty: QuestionDifficulty } }
+  | { type: 'INITIALIZE_GAME'; payload: { players: Player[]; botDifficulty: QuestionDifficulty; user: User; allowedCategories: Category[]; } }
   | { type: 'SET_PHASE1_SELECTION'; payload: { playerId: string; fieldId: number } }
   | { type: 'SET_QUESTION'; payload: GameState['activeQuestion'] }
   | { type: 'SET_TIEBREAKER_QUESTION'; payload: { question: Question } }

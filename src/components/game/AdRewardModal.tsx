@@ -4,7 +4,8 @@ import { themes } from '../../themes';
 import { Modal } from '../ui/Modal';
 import { NeonButton } from '../ui/NeonButton';
 import { LuduCoin } from '../ui/LuduCoin';
-import { AD_REWARD_COINS } from '../../constants';
+// FIX: Replaced the non-existent constant AD_REWARD_COINS with DAILY_REWARD_COINS to fix the build error.
+import { DAILY_REWARD_COINS } from '../../constants';
 import { useTranslation } from '../../i18n/LanguageContext';
 
 
@@ -18,7 +19,7 @@ export const AdRewardModal: React.FC<{ onClaim: () => void; themeConfig: typeof 
                 <p className="text-gray-400">{t('videoPlaying')}</p>
             </div>
             <NeonButton onClick={onClaim} themeConfig={themeConfig}>
-                {t('getCoins')} <span className="font-bold text-yellow-300">{AD_REWARD_COINS}</span> <LuduCoin className="w-8 h-8" themeConfig={themeConfig}/>
+                {t('getCoins')} <span className="font-bold text-yellow-300">{DAILY_REWARD_COINS}</span> <LuduCoin className="w-8 h-8" themeConfig={themeConfig}/>
             </NeonButton>
         </div>
     </Modal>
