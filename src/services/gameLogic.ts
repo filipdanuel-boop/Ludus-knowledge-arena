@@ -101,119 +101,130 @@ export const getAttackers = (players: Player[]): Player[] => {
     return sortedPlayers.slice(0, attackerCount);
 };
 
-// --- Bot Decision Making ---
+// --- Bot Decision Making Refactored ---
+
+type BotAction = { action: 'HEAL' | 'ATTACK'; targetField: Field };
+
+// Helper 1: Find all possible actions
+const getBotPossibleActions = (gameState: GameState): BotAction[] => {
+    const bot = gameState.players[gameState.currentTurnPlayerIndex];
+    const possibleActions: BotAction[] = [];
+
+    const botBase = gameState.board.find(f => f.ownerId === bot.id && f.type === 'PLAYER_BASE');
+    if (botBase && botBase.hp < botBase.maxHp) {
+        possibleActions.push({ action: 'HEAL', targetField: botBase });
+    }
+
+    const potentialTargets = gameState.board.filter(f => (f.ownerId !== null && f.ownerId !== bot.id) || f.type === 'BLACK');
+    for (const targetField of potentialTargets) {
+        possibleActions.push({ action: 'ATTACK', targetField });
+    }
+    
+    return possibleActions;
+};
+
+// Helper 2: Score a single action for strategic evaluation
+const scoreBotAction = (botAction: BotAction, gameState: GameState): number => {
+    const { players } = gameState;
+    
+    if (botAction.action === 'HEAL') {
+        const botBase = botAction.targetField;
+        let healScore = (botBase.maxHp - botBase.hp) * 30;
+        if (botBase.hp === 1) healScore += 70; // High priority if base is at 1 HP
+        return healScore;
+    }
+    
+    const { targetField } = botAction;
+    let attackScore = 10; // Base score for any attack
+    const targetPlayer = players.find(p => p.id === targetField.ownerId);
+    const highestScore = Math.max(...players.filter(p => !p.isEliminated).map(p => p.score));
+    
+    if (targetField.type === 'PLAYER_BASE') {
+        attackScore += 60;
+        attackScore += (targetField.maxHp - targetField.hp) * 25; // Prioritize damaged bases
+    } else if (targetField.type === 'BLACK') {
+        attackScore += 5;
+    } else { // Normal field
+        attackScore += 15;
+    }
+
+    if (targetPlayer) {
+        attackScore += (highestScore - targetPlayer.score) / 50; // Prioritize weaker players
+        const territoryCount = gameState.board.filter(f => f.ownerId === targetPlayer.id).length;
+        attackScore += (10 - territoryCount) * 3; // Prioritize players with fewer territories
+        if (!targetPlayer.isBot) attackScore *= 1.1; // Prioritize human player
+    }
+    
+    return attackScore;
+};
+
+// Helper 3: Determine category and difficulty for the chosen action
+const getActionParameters = (botAction: BotAction, bot: Player): { category: Category, difficulty: QuestionDifficulty } | null => {
+    if (botAction.action === 'HEAL') {
+        return { category: botAction.targetField.category!, difficulty: 'medium' };
+    }
+
+    const { targetField } = botAction;
+    let availableCategories = CATEGORIES.filter(c => !bot.usedAttackCategories.includes(c));
+    // If all categories are used, start a new cycle. This fixes bots getting stuck.
+    if (availableCategories.length === 0 && bot.usedAttackCategories.length > 0) {
+        availableCategories = [...CATEGORIES];
+    }
+    
+    if (availableCategories.length === 0) return null; // Can't attack if no categories exist at all
+
+    let category: Category;
+    let difficulty: QuestionDifficulty;
+
+    if (targetField.type === 'PLAYER_BASE') {
+        category = targetField.category!;
+        difficulty = 'hard';
+    } else if (targetField.type === 'BLACK') {
+        category = availableCategories[Math.floor(Math.random() * availableCategories.length)];
+        difficulty = 'medium';
+    } else { // Normal field
+        category = availableCategories[Math.floor(Math.random() * availableCategories.length)];
+        difficulty = 'easy';
+    }
+    
+    return { category, difficulty };
+};
+
+// Main AI decision function using the helpers
 export const decideBotAction = (gameState: GameState): { action: 'HEAL' | 'ATTACK' | 'PASS', targetField?: Field, category?: Category, reason?: string, difficulty?: QuestionDifficulty } => {
     const bot = gameState.players[gameState.currentTurnPlayerIndex];
     const difficulty = gameState.botDifficulty;
 
-    // --- EASY BOT ---
-    if (difficulty === 'easy') {
-        const botBase = gameState.board.find(f => f.ownerId === bot.id && f.type === 'PLAYER_BASE');
-        if (botBase && botBase.hp < botBase.maxHp && Math.random() < 0.25) {
-            return { action: 'HEAL', targetField: botBase, category: botBase.category!, difficulty: 'easy' };
-        }
-        const validTargets = gameState.board.filter(f => (f.ownerId !== null && f.ownerId !== bot.id) || f.type === 'BLACK');
-        if (validTargets.length === 0) {
-            return { action: 'PASS', reason: "No valid targets found." };
-        }
-        const targetField = validTargets[Math.floor(Math.random() * validTargets.length)];
-        const isBaseAttack = targetField.type === 'PLAYER_BASE';
-        let category: Category;
-        let questionDifficulty: QuestionDifficulty = 'easy';
-
-        if (isBaseAttack) {
-            category = targetField.category!;
-            questionDifficulty = 'medium';
-        } else {
-            let availableCategories = CATEGORIES.filter(c => !bot.usedAttackCategories.includes(c));
-            if (availableCategories.length === 0) {
-                // Reset the categories if all have been used
-                bot.usedAttackCategories = [];
-                availableCategories = [...CATEGORIES];
-            }
-            category = availableCategories[Math.floor(Math.random() * availableCategories.length)];
-        }
-        return { action: 'ATTACK', targetField, category, difficulty: questionDifficulty };
-    }
-
-    // --- MEDIUM & HARD BOTS ---
-    const possibleActions: { score: number; action: 'HEAL' | 'ATTACK'; targetField: Field }[] = [];
-    const botBase = gameState.board.find(f => f.ownerId === bot.id && f.type === 'PLAYER_BASE')!;
-
-    // 1. Calculate score for healing
-    if (botBase.hp < botBase.maxHp) {
-        let healScore = (botBase.maxHp - botBase.hp) * 30; // e.g., 1 missing HP = 30 points
-        if (botBase.hp === 1) healScore += 70; // high priority if base is at 1 HP
-        possibleActions.push({ score: healScore, action: 'HEAL', targetField: botBase });
-    }
-
-    // 2. Calculate scores for all possible attack targets
-    const potentialTargets = gameState.board.filter(f => (f.ownerId !== null && f.ownerId !== bot.id) || f.type === 'BLACK');
-    const highestScore = Math.max(...gameState.players.filter(p => !p.isEliminated).map(p => p.score));
-
-    for (const targetField of potentialTargets) {
-        let attackScore = 10; // base score for any attack
-        const targetPlayer = gameState.players.find(p => p.id === targetField.ownerId);
-
-        if (targetField.type === 'PLAYER_BASE') {
-            attackScore += 60; // high priority for base attack
-            attackScore += (targetField.maxHp - targetField.hp) * 25; // prioritize damaged bases
-        } else if (targetField.type === 'BLACK') {
-            attackScore += 5; // low priority for black fields
-        } else { // Normal player-owned field
-            attackScore += 15;
-        }
-
-        if (targetPlayer) {
-            attackScore += (highestScore - targetPlayer.score) / 50;
-            const territoryCount = gameState.board.filter(f => f.ownerId === targetPlayer.id).length;
-            attackScore += (10 - territoryCount) * 3;
-            if (!targetPlayer.isBot) attackScore *= 1.1; // Prioritize human player
-        }
-        possibleActions.push({ score: attackScore, action: 'ATTACK', targetField });
-    }
-
-    // 3. Choose action based on scores and difficulty
+    const possibleActions = getBotPossibleActions(gameState);
     if (possibleActions.length === 0) {
-        return { action: 'PASS', reason: "No valid actions found." };
+        return { action: 'PASS', reason: "No valid actions." };
     }
+    
+    let chosenAction: BotAction;
 
-    possibleActions.sort((a, b) => b.score - a.score); // sort descending by score
-
-    let chosenAction = possibleActions[0]; // Default to best action for hard bot
-    if (difficulty === 'medium' && Math.random() > 0.65) { // 35% chance for medium bot to not pick the best action
+    if (difficulty === 'easy') {
         chosenAction = possibleActions[Math.floor(Math.random() * possibleActions.length)];
-    }
+    } else {
+        const scoredActions = possibleActions.map(act => ({ ...act, score: scoreBotAction(act, gameState) }));
+        scoredActions.sort((a, b) => b.score - a.score);
 
-    // 4. Determine category and question difficulty for chosen action
-    const { action, targetField } = chosenAction;
-    let category: Category;
-    let questionDifficulty: QuestionDifficulty;
-
-    if (action === 'HEAL') {
-        category = targetField.category!;
-        questionDifficulty = 'medium';
-    } else { // ATTACK
-        let availableCategories = CATEGORIES.filter(c => !bot.usedAttackCategories.includes(c));
-        if (availableCategories.length === 0) {
-            // Reset categories if all used
-            bot.usedAttackCategories = [];
-            availableCategories = [...CATEGORIES];
-        }
-
-        if (targetField.type === 'PLAYER_BASE') {
-            category = targetField.category!;
-            questionDifficulty = 'hard';
-        } else if (targetField.type === 'BLACK') {
-            category = availableCategories[Math.floor(Math.random() * availableCategories.length)];
-            questionDifficulty = 'medium';
-        } else { // Normal field
-            category = availableCategories[Math.floor(Math.random() * availableCategories.length)];
-            questionDifficulty = 'easy';
+        chosenAction = scoredActions[0]; // Hard bot always picks the best action
+        if (difficulty === 'medium' && Math.random() > 0.65) { // 35% chance to be suboptimal
+             chosenAction = scoredActions[Math.floor(Math.random() * scoredActions.length)];
         }
     }
+    
+    const params = getActionParameters(chosenAction, bot);
+    if (!params) {
+        return { action: 'PASS', reason: "No available attack categories." };
+    }
 
-    return { action, targetField, category, difficulty: questionDifficulty };
+    return { 
+        action: chosenAction.action, 
+        targetField: chosenAction.targetField, 
+        category: params.category, 
+        difficulty: params.difficulty 
+    };
 };
 
 
@@ -313,7 +324,8 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
 
             if (attacker && actionType === 'ATTACK' && !isBaseAttack) {
                 let used = [...attacker.usedAttackCategories];
-                if (used.length === CATEGORIES.length) {
+                // If the list is full, it means we are starting a new cycle. Clear it first.
+                if (used.length >= CATEGORIES.length) {
                     used = [];
                 }
                 if (!used.includes(category)) {
