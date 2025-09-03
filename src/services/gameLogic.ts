@@ -205,96 +205,8 @@ export const decideBotAction = (gameState: GameState): { action: 'HEAL' | 'ATTAC
     return { action, targetField, category, difficulty: questionDifficulty };
 };
 
-const handleHealAction = (state: GameState) => {
-    const { attackerId, playerAnswers, question } = state.activeQuestion!;
-    const attacker = state.players.find(p => p.id === attackerId)!;
-    const field = state.board.find(f => f.ownerId === attackerId && f.type === 'PLAYER_BASE')!;
-    const isCorrect = normalizeAnswer(playerAnswers[attackerId] || "") === normalizeAnswer(question.correctAnswer);
 
-    if (isCorrect) {
-        field.hp = Math.min(field.maxHp, field.hp + 1);
-        attacker.score += POINTS.HEAL_SUCCESS;
-        state.gameLog.push(`${attacker.name} si úspěšně opravil základnu.`);
-    } else {
-        attacker.score += POINTS.HEAL_FAIL_PENALTY;
-        state.gameLog.push(`${attacker.name} neuspěl při opravě.`);
-    }
-    return state;
-};
-
-const handleAttackAction = (state: GameState) => {
-    const { attackerId, defenderId, targetFieldId, playerAnswers, question, isBaseAttack } = state.activeQuestion!;
-    const attacker = state.players.find(p => p.id === attackerId)!;
-    const field = state.board.find(f => f.id === targetFieldId)!;
-    
-    if (defenderId) {
-        const defender = state.players.find(p => p.id === defenderId)!;
-        const isAttackerCorrect = normalizeAnswer(playerAnswers[attackerId] || "") === normalizeAnswer(question.correctAnswer);
-        const isDefenderCorrect = normalizeAnswer(playerAnswers[defenderId] || "") === normalizeAnswer(question.correctAnswer);
-        
-        if (isAttackerCorrect && !isDefenderCorrect) {
-            field.hp -= 1;
-            if (isBaseAttack) {
-                attacker.score += POINTS.ATTACK_DAMAGE;
-                state.gameLog.push(`${attacker.name} zasáhl základnu hráče ${defender.name}!`);
-            } else {
-                field.ownerId = attackerId;
-                field.hp = field.maxHp;
-                attacker.score += POINTS.ATTACK_WIN;
-                defender.score += POINTS.ATTACK_LOSS_DEFENDER;
-                state.gameLog.push(`${attacker.name} dobyl území od hráče ${defender.name}!`);
-            }
-        } else if (!isAttackerCorrect && isDefenderCorrect) {
-            attacker.score += POINTS.ATTACK_LOSS_ATTACKER;
-            if (!isBaseAttack) defender.score += POINTS.ATTACK_WIN_DEFENDER;
-            state.gameLog.push(`${defender.name} ubránil své území.`);
-        } else if (isAttackerCorrect && isDefenderCorrect) {
-            if(isBaseAttack) {
-                 state.gameLog.push(`${defender.name} ubránil svou základnu v napínavém souboji!`);
-            } else {
-                state.gameLog.push(`Souboj mezi ${attacker.name} a ${defender.name} skončil remízou! Území bylo ubráněno.`);
-            }
-        } else {
-            attacker.score += POINTS.ATTACK_LOSS_ATTACKER;
-            state.gameLog.push(`Útok hráče ${attacker.name} se nezdařil, oba odpověděli špatně.`);
-        }
-    } else {
-        const isAttackerCorrect = normalizeAnswer(playerAnswers[attackerId] || "") === normalizeAnswer(question.correctAnswer);
-        const wasBlackField = field.type === FieldType.Black;
-        if (isAttackerCorrect) {
-            field.ownerId = attackerId;
-            field.type = FieldType.Neutral;
-            field.hp = field.maxHp;
-            attacker.score += wasBlackField ? POINTS.BLACK_FIELD_CLAIM : POINTS.PHASE1_CLAIM;
-            state.gameLog.push(`${attacker.name} zabral ${wasBlackField ? 'černé' : ''} území!`);
-        } else {
-            attacker.score += wasBlackField ? POINTS.BLACK_FIELD_FAIL : POINTS.ATTACK_LOSS_ATTACKER;
-            state.gameLog.push(`${attacker.name} neuspěl na ${wasBlackField ? 'černém' : ''} území.`);
-        }
-    }
-    return state;
-};
-
-const checkForEliminations = (state: GameState): GameState => {
-    if (!state.activeQuestion) return state;
-    const { attackerId, targetFieldId, isBaseAttack } = state.activeQuestion;
-    const attacker = state.players.find(p => p.id === attackerId)!;
-    const field = state.board.find(f => f.id === targetFieldId)!;
-    
-    if (isBaseAttack && field.hp <= 0) {
-        const defender = state.players.find(p => p.id === field.ownerId)!;
-        if (!defender.isEliminated) {
-            attacker.score += POINTS.BASE_DESTROY_BONUS + Math.max(0, defender.score);
-            attacker.coins += ELIMINATION_COIN_BONUS;
-            defender.score = 0;
-            defender.isEliminated = true;
-            state.eliminationResult = { eliminatedPlayerName: defender.name, attackerName: attacker.name };
-            state.gameLog.push(`${attacker.name} ZNIČIL základnu hráče ${defender.name}!`);
-            state.board.forEach(f => { if (f.ownerId === defender.id) f.ownerId = attacker.id; });
-        }
-    }
-    return state;
-};
+// --- Game State Machine ---
 
 const advanceTurnAndRound = (state: GameState): GameState => {
     const activePlayers = state.players.filter(p => !p.isEliminated);
@@ -336,29 +248,31 @@ const advanceTurnAndRound = (state: GameState): GameState => {
         state.currentTurnPlayerIndex = state.players.findIndex(p => p.id === nextAttacker.id);
     }
 
+    state.gamePhase = GamePhase.Phase2_Attacks;
     return state;
 };
 
-
-const resolveTurn = (state: GameState): GameState => {
-    let newState = JSON.parse(JSON.stringify(state));
-    if (!newState.activeQuestion) return newState;
-
-    const { actionType } = newState.activeQuestion;
+const checkForEliminations = (state: GameState): GameState => {
+    if (!state.activeQuestion) return state;
+    const { attackerId, targetFieldId, isBaseAttack } = state.activeQuestion;
+    const attacker = state.players.find(p => p.id === attackerId)!;
+    const field = state.board.find(f => f.id === targetFieldId)!;
     
-    if (actionType === 'HEAL') {
-        newState = handleHealAction(newState);
-    } else if (actionType === 'ATTACK') {
-        newState = handleAttackAction(newState);
+    if (isBaseAttack && field.hp <= 0) {
+        const defender = state.players.find(p => p.id === field.ownerId)!;
+        if (!defender.isEliminated) {
+            attacker.score += POINTS.BASE_DESTROY_BONUS + Math.max(0, defender.score);
+            attacker.coins += ELIMINATION_COIN_BONUS;
+            defender.score = 0;
+            defender.isEliminated = true;
+            state.eliminationResult = { eliminatedPlayerName: defender.name, attackerName: attacker.name };
+            state.gameLog.push(`${attacker.name} ZNIČIL základnu hráče ${defender.name}!`);
+            state.board.forEach(f => { if (f.ownerId === defender.id) f.ownerId = attacker.id; });
+        }
     }
+    return state;
+};
 
-    newState = checkForEliminations(newState);
-    newState = advanceTurnAndRound(newState);
-    
-    newState.activeQuestion = null;
-
-    return newState;
-}
 
 export const gameReducer = (state: GameState | null, action: GameAction): GameState | null => {
     if (!state && action.type !== 'INITIALIZE_GAME') return null;
@@ -370,28 +284,19 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
         case 'SET_PHASE1_SELECTION': {
             if (!state) return null;
             const updatedSelections = { ...state.phase1Selections, [action.payload.playerId]: action.payload.fieldId };
+            
             const activePlayers = state.players.filter(p => !p.isEliminated);
             const allPlayersSelected = activePlayers.every(p => updatedSelections[p.id] != null);
 
             if (allPlayersSelected) {
-                return {
-                    ...state,
-                    phase1Selections: updatedSelections,
-                    gamePhase: GamePhase.Phase1_ShowQuestion,
-                    phaseStartTime: Date.now(),
-                };
+                return { ...state, phase1Selections: updatedSelections, gamePhase: GamePhase.Phase1_ShowQuestion, phaseStartTime: Date.now() };
             }
-            
-            return {
-                ...state,
-                phase1Selections: updatedSelections,
-            };
+            return { ...state, phase1Selections: updatedSelections };
         }
 
         case 'SET_QUESTION': {
-            if (!state) return null;
+            if (!state) return state;
             const { attackerId, actionType, category, question, isBaseAttack } = action.payload!;
-            
             const newState = JSON.parse(JSON.stringify(state));
             const attacker = newState.players.find((p: Player) => p.id === attackerId);
 
@@ -406,14 +311,9 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
             
             newState.questionHistory.push(question.question);
             newState.activeQuestion = action.payload;
-
             return newState;
         }
 
-        case 'CLEAR_QUESTION':
-            if (!state) return null;
-            return { ...state, activeQuestion: null };
-        
         case 'SUBMIT_ANSWER': {
             if (!state || !state.activeQuestion) return state;
             const { playerId, answer, category } = action.payload;
@@ -440,87 +340,136 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
                      playerStats.xpEarned += XP_PER_CORRECT_ANSWER * difficultyMultiplier;
                 }
             }
-
+            
             let nextPhase = state.gamePhase;
-            if (state.gamePhase === GamePhase.Phase1_ShowQuestion) {
-                const allAnswered = Object.values(updatedActiveQuestion.playerAnswers).every(ans => ans !== null);
-                if (allAnswered) {
-                    nextPhase = GamePhase.Phase1_SelectionResolved;
+            const allAnswered = Object.values(updatedActiveQuestion.playerAnswers).every(ans => ans !== null);
+            if (allAnswered) {
+                if(state.gamePhase === GamePhase.Phase1_ShowQuestion) {
+                    nextPhase = GamePhase.Phase1_ResolveRound;
+                } else {
+                    nextPhase = GamePhase.Phase2_CombatResolve;
                 }
             }
 
             return {
                 ...state,
                 activeQuestion: updatedActiveQuestion,
-                answerResult: { playerId, isCorrect, correctAnswer: state.activeQuestion.question.correctAnswer },
+                answerResult: { playerId, isCorrect },
                 matchStats: newMatchStats,
                 gamePhase: nextPhase,
             };
         }
 
-        case 'RESOLVE_PHASE1_ROUND': {
-            if (!state) return null;
+        case 'RESOLVE_COMBAT': {
+            if (!state) return state;
             let newState = JSON.parse(JSON.stringify(state));
-            const humanPlayer = newState.players.find((p: Player) => !p.isBot)!;
-            const fieldIndex = newState.board.findIndex((f: Field) => f.id === action.payload.fieldId);
-        
-            if (fieldIndex !== -1) {
-                if (action.payload.humanActionResult === 'win') {
-                    newState.board[fieldIndex].ownerId = humanPlayer.id;
-                    humanPlayer.score += POINTS.PHASE1_CLAIM;
-                    newState.gameLog.push(`${humanPlayer.name} jste zabral pole a získal ${POINTS.PHASE1_CLAIM} bodů.`);
+            if (!newState.activeQuestion) return newState;
+
+            const { actionType, attackerId, defenderId, isBaseAttack, isTieBreaker, playerAnswers, question, targetFieldId } = newState.activeQuestion;
+            const attacker = newState.players.find((p: Player) => p.id === attackerId)!;
+            const field = newState.board.find((f: Field) => f.id === targetFieldId)!;
+
+            if (actionType === 'HEAL') {
+                const isCorrect = normalizeAnswer(playerAnswers[attackerId] || "") === normalizeAnswer(question.correctAnswer);
+                if (isCorrect) {
+                    field.hp = Math.min(field.maxHp, field.hp + 1);
+                    attacker.score += POINTS.HEAL_SUCCESS;
+                    newState.gameLog.push(`${attacker.name} si úspěšně opravil základnu.`);
                 } else {
-                    newState.board[fieldIndex].type = FieldType.Black;
-                    newState.gameLog.push(`${humanPlayer.name} jste odpověděl špatně. Pole zčernalo.`);
+                    attacker.score += POINTS.HEAL_FAIL_PENALTY;
+                    newState.gameLog.push(`${attacker.name} neuspěl při opravě.`);
+                }
+            } else if (actionType === 'ATTACK') {
+                const isAttackerCorrect = normalizeAnswer(playerAnswers[attackerId] || "") === normalizeAnswer(question.correctAnswer);
+                if (defenderId) {
+                    const defender = newState.players.find((p: Player) => p.id === defenderId)!;
+                    const isDefenderCorrect = normalizeAnswer(playerAnswers[defenderId] || "") === normalizeAnswer(question.correctAnswer);
+                    
+                    if (isAttackerCorrect && isDefenderCorrect && !isBaseAttack && !isTieBreaker) {
+                        newState.gamePhase = GamePhase.Phase2_Tiebreaker;
+                        newState.gameLog.push(`ROZSTŘEL mezi ${attacker.name} a ${defender.name}!`);
+                        return newState;
+                    }
+                    
+                    if (isAttackerCorrect && !isDefenderCorrect) {
+                        field.hp -= 1;
+                        if (isBaseAttack) {
+                            attacker.score += POINTS.ATTACK_DAMAGE;
+                            newState.gameLog.push(`${attacker.name} zasáhl základnu hráče ${defender.name}!`);
+                        } else {
+                            field.ownerId = attackerId;
+                            field.hp = field.maxHp;
+                            attacker.score += POINTS.ATTACK_WIN;
+                            defender.score += POINTS.ATTACK_LOSS_DEFENDER;
+                            newState.gameLog.push(`${attacker.name} dobyl území od hráče ${defender.name}!`);
+                        }
+                    } else if (!isAttackerCorrect && isDefenderCorrect) {
+                        attacker.score += POINTS.ATTACK_LOSS_ATTACKER;
+                        if (!isBaseAttack) defender.score += POINTS.ATTACK_WIN_DEFENDER;
+                        newState.gameLog.push(`${defender.name} ubránil své území.`);
+                    } else if (isAttackerCorrect && isDefenderCorrect) {
+                        newState.gameLog.push(`Souboj mezi ${attacker.name} a ${defender.name} skončil remízou!`);
+                    } else {
+                        attacker.score += POINTS.ATTACK_LOSS_ATTACKER;
+                        newState.gameLog.push(`Útok hráče ${attacker.name} se nezdařil, oba odpověděli špatně.`);
+                    }
+                } else {
+                    if (isAttackerCorrect) {
+                        field.ownerId = attackerId;
+                        field.type = FieldType.Neutral;
+                        field.hp = field.maxHp;
+                        attacker.score += field.type === FieldType.Black ? POINTS.BLACK_FIELD_CLAIM : POINTS.PHASE1_CLAIM;
+                        newState.gameLog.push(`${attacker.name} zabral území!`);
+                    } else {
+                        attacker.score += field.type === FieldType.Black ? POINTS.BLACK_FIELD_FAIL : POINTS.ATTACK_LOSS_ATTACKER;
+                        newState.gameLog.push(`${attacker.name} neuspěl na území.`);
+                    }
                 }
             }
-        
-            const botSelections = Object.entries(newState.phase1Selections || {}).filter(([playerId]) => playerId !== humanPlayer.id);
-            
-            for (const [botId, botFieldId] of botSelections) {
-                if (botFieldId === null) continue;
-                const botPlayer = newState.players.find((p: Player) => p.id === botId)!;
-                const botFieldIndex = newState.board.findIndex((f: Field) => f.id === botFieldId);
-                if (botFieldIndex !== -1 && newState.board[botFieldIndex].type === FieldType.Neutral && !newState.board[botFieldIndex].ownerId) {
-                     if (Math.random() < 0.7) {
-                        newState.board[botFieldIndex].ownerId = botId;
-                        botPlayer.score += POINTS.PHASE1_CLAIM;
-                        newState.gameLog.push(`${botPlayer.name} odpověděl správně a zabral pole.`);
-                     } else {
-                        newState.board[botFieldIndex].type = FieldType.Black;
-                        newState.gameLog.push(`${botPlayer.name} odpověděl špatně.`);
-                     }
-                }
-            }
-        
-            newState.round += 1;
-            if (newState.round > PHASE_DURATIONS.PHASE1_ROUNDS) {
-                newState.gamePhase = GamePhase.TransitionToPhase2;
-                newState.round = 1;
-                newState.gameLog.push("--- Fáze 1 skončila! ---");
-            } else {
-                newState.gamePhase = GamePhase.Phase1_PickField;
-                newState.phaseStartTime = Date.now();
-            }
-        
+
+            newState = checkForEliminations(newState);
             newState.activeQuestion = null;
-            newState.answerResult = null;
-            newState.phase1Selections = {};
+
+            if (newState.gamePhase === GamePhase.Phase1_ResolveRound) {
+                newState.round++;
+                if (newState.round > PHASE_DURATIONS.PHASE1_ROUNDS) {
+                    newState.gamePhase = GamePhase.TransitionToPhase2;
+                    newState.round = 1;
+                    newState.gameLog.push("--- Fáze 1 skončila! ---");
+                } else {
+                    newState.gamePhase = GamePhase.Phase1_PickField;
+                    newState.phaseStartTime = Date.now();
+                }
+                newState.phase1Selections = {};
+            } else {
+                newState = advanceTurnAndRound(newState);
+            }
+            
             return newState;
         }
 
-        case 'RESOLVE_TURN':
-            if (!state) return null;
-            return resolveTurn(state);
-            
+        case 'SET_TIEBREAKER_QUESTION': {
+            if (!state || !state.activeQuestion) return state;
+            const { attackerId, defenderId } = state.activeQuestion;
+            return {
+                ...state,
+                questionHistory: [...state.questionHistory, action.payload.question.question],
+                activeQuestion: {
+                    ...state.activeQuestion,
+                    question: action.payload.question,
+                    questionType: 'OPEN_ENDED',
+                    isTieBreaker: true,
+                    playerAnswers: { [attackerId]: null, [defenderId!]: null },
+                    startTime: Date.now()
+                }
+            };
+        }
+
         case 'CLEAR_ANSWER_FEEDBACK':
             return state ? { ...state, answerResult: null } : null;
         
         case 'CLEAR_ELIMINATION_FEEDBACK':
             return state ? { ...state, eliminationResult: null } : null;
-
-        case 'UPDATE_PLAYERS':
-            return state ? { ...state, players: action.payload } : null;
 
         case 'PASS_BOT_TURN': {
             if (!state) return state;
@@ -528,42 +477,37 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
             const { botId, reason } = action.payload;
             const bot = newState.players.find((p: Player) => p.id === botId)!;
             newState.gameLog.push(`${bot.name} (Bot) přeskakuje tah: ${reason}`);
-            
             newState = advanceTurnAndRound(newState);
             return newState;
         }
         
         case 'AUTO_SELECT_FIELD': {
             if (!state || state.gamePhase !== GamePhase.Phase1_PickField) return state;
-            const humanPlayer = state.players.find(p => !p.isBot);
-            if (!humanPlayer || (state.phase1Selections && state.phase1Selections[humanPlayer.id] != null)) {
-                return state;
-            }
+            const humanPlayer = state.players.find(p => !p.isBot)!;
+            const selections = { ...(state.phase1Selections || {}) };
 
-            const availableFields = state.board.filter(f => f.type === 'NEUTRAL' && !f.ownerId && !Object.values(state.phase1Selections || {}).includes(f.id));
-            if (availableFields.length === 0) {
-                return state;
+            if (selections[humanPlayer.id] == null) {
+                const availableFields = state.board.filter(f => f.type === 'NEUTRAL' && !f.ownerId && !Object.values(selections).includes(f.id));
+                if (availableFields.length > 0) {
+                    selections[humanPlayer.id] = availableFields.splice(Math.floor(Math.random() * availableFields.length), 1)[0].id;
+                }
             }
             
-            const randomFieldIndex = Math.floor(Math.random() * availableFields.length);
-            const selectedField = availableFields[randomFieldIndex];
-
-            const newState = JSON.parse(JSON.stringify(state));
-            newState.phase1Selections[humanPlayer.id] = selectedField.id;
-            newState.gameLog.push(`${humanPlayer.name} did not select a field. One was chosen automatically.`);
-            
-            const remainingFields = availableFields.filter(f => f.id !== selectedField.id);
-            newState.players.filter((p: Player) => p.isBot && !p.isEliminated).forEach((bot: Player) => {
-                if (remainingFields.length > 0) {
-                    const botFieldIndex = Math.floor(Math.random() * remainingFields.length);
-                    const botField = remainingFields.splice(botFieldIndex, 1)[0];
-                    newState.phase1Selections[bot.id] = botField.id;
+            state.players.filter(p => p.isBot && !p.isEliminated).forEach(bot => {
+                if (selections[bot.id] == null) {
+                    const availableFields = state.board.filter(f => f.type === 'NEUTRAL' && !f.ownerId && !Object.values(selections).includes(f.id));
+                     if (availableFields.length > 0) {
+                        selections[bot.id] = availableFields.splice(Math.floor(Math.random() * availableFields.length), 1)[0].id;
+                    }
                 }
             });
 
-            newState.gamePhase = GamePhase.Phase1_ShowQuestion;
-            newState.phaseStartTime = Date.now();
-            return newState;
+            return {
+                ...state,
+                phase1Selections: selections,
+                gamePhase: GamePhase.Phase1_ShowQuestion,
+                phaseStartTime: Date.now(),
+            };
         }
 
         case 'SET_STATE':

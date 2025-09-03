@@ -15,11 +15,11 @@ export enum GamePhase {
   TransitionToPhase1 = "TRANSITION_TO_PHASE_1",
   Phase1_PickField = "Phase1_PickField",
   Phase1_ShowQuestion = "Phase1_ShowQuestion",
-  Phase1_SelectionResolved = "Phase1_SelectionResolved",
-  Phase1_RoundEnd = "Phase1_RoundEnd",
+  Phase1_ResolveRound = "Phase1_ResolveRound",
   TransitionToPhase2 = "TRANSITION_TO_PHASE_2",
   Phase2_Attacks = "PHASE_2_ÚTOKY",
-  Phase3_FinalShowdown = "PHASE_3_FINÁLE",
+  Phase2_CombatResolve = "Phase2_CombatResolve",
+  Phase2_Tiebreaker = "Phase2_Tiebreaker",
   GameOver = "GAME_OVER",
 }
 
@@ -92,7 +92,6 @@ export interface GameState {
   answerResult: {
     playerId: string;
     isCorrect: boolean;
-    correctAnswer: string;
   } | null;
   eliminationResult: {
       eliminatedPlayerName: string;
@@ -140,11 +139,10 @@ export type GameAction =
   | { type: 'INITIALIZE_GAME'; payload: { playerCount: number; user: User, isOnlineMode?: boolean, botDifficulty?: QuestionDifficulty } }
   | { type: 'SET_PHASE1_SELECTION'; payload: { playerId: string; fieldId: number } }
   | { type: 'SET_QUESTION'; payload: GameState['activeQuestion'] }
+  | { type: 'SET_TIEBREAKER_QUESTION'; payload: { question: Question } }
   | { type: 'CLEAR_QUESTION' }
   | { type: 'SUBMIT_ANSWER'; payload: { playerId: string; answer: string; category: Category } }
-  | { type: 'RESOLVE_PHASE1_ROUND'; payload: { humanActionResult: 'win' | 'loss', fieldId: number } }
-  | { type: 'RESOLVE_TURN'; payload?: { tieBreakerQuestion?: Question } }
-  | { type: 'SET_ANSWER_FEEDBACK'; payload: GameState['answerResult'] }
+  | { type: 'RESOLVE_COMBAT' }
   | { type: 'CLEAR_ANSWER_FEEDBACK' }
   | { type: 'SET_ELIMINATION_FEEDBACK'; payload: GameState['eliminationResult'] }
   | { type: 'CLEAR_ELIMINATION_FEEDBACK' }

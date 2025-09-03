@@ -4,9 +4,7 @@ import { themes } from '../../themes';
 import { Modal } from '../ui/Modal';
 import { Spinner } from '../ui/Spinner';
 import { NeonButton } from '../ui/NeonButton';
-import { LuduCoin } from '../ui/LuduCoin';
 import { TimerUI } from './TimerUI';
-import { HINT_COSTS } from '../../constants';
 import { useTranslation } from '../../i18n/LanguageContext';
 
 const ANSWER_TIME_LIMIT = 15;
@@ -14,12 +12,11 @@ const ANSWER_TIME_LIMIT = 15;
 export const QuestionModal: React.FC<{
     activeQuestion: GameState['activeQuestion'];
     onAnswer: (answer: string) => void;
-    onUseHint: () => void;
     onTimeout: () => void;
     loading: boolean;
     humanPlayer: Player;
     themeConfig: typeof themes[Theme];
-}> = ({ activeQuestion, onAnswer, onUseHint, onTimeout, loading, humanPlayer, themeConfig }) => {
+}> = ({ activeQuestion, onAnswer, onTimeout, loading, humanPlayer, themeConfig }) => {
     const { t } = useTranslation();
     const [writtenAnswer, setWrittenAnswer] = React.useState("");
     
@@ -27,7 +24,6 @@ export const QuestionModal: React.FC<{
         setWrittenAnswer(""); // Reset on new question
     }, [activeQuestion?.question.question]);
 
-    const canAffordHint = humanPlayer.coins >= HINT_COSTS.AUTO_ANSWER;
     const isAnswering = activeQuestion && activeQuestion.playerAnswers[humanPlayer.id] === null;
     const isHealing = activeQuestion?.actionType === 'HEAL';
     const isTieBreaker = activeQuestion?.isTieBreaker;
@@ -85,19 +81,6 @@ export const QuestionModal: React.FC<{
                                 <NeonButton type="submit" disabled={!isAnswering || !writtenAnswer.trim()} themeConfig={themeConfig}>{t('submit')}</NeonButton>
                              </div>
                         </form>
-                    )}
-                     {isAnswering && questionType === 'MULTIPLE_CHOICE' && (
-                        <div className="mt-6 border-t border-gray-700 pt-4 flex justify-end">
-                            <NeonButton 
-                                variant="secondary" 
-                                onClick={onUseHint}
-                                disabled={!canAffordHint}
-                                title={!canAffordHint ? t('insufficientCoins') : ""}
-                                themeConfig={themeConfig}
-                            >
-                                {t('hint', HINT_COSTS.AUTO_ANSWER)} <LuduCoin className="w-5 h-5" themeConfig={themeConfig}/>
-                            </NeonButton>
-                        </div>
                     )}
                 </div>
             )}

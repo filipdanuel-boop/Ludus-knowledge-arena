@@ -54,10 +54,6 @@ export const PHASE_DURATIONS = {
   PHASE2_ROUNDS: 6,
 };
 
-export const HINT_COSTS = {
-    AUTO_ANSWER: 500,
-};
-
 export const BOT_NAMES = [
     "ShadowStriker", "QuantumLeap", "Vortex", "Nebula", "CyberJaw", 
     "Pulse", "Ghost", "Echo", "Titan", "Viper", "Omega"
