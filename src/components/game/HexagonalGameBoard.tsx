@@ -73,7 +73,8 @@ export const HexagonalGameBoard: React.FC<HexagonalGameBoardProps> = ({ gameStat
             stroke = '#4b5563';
         }
 
-        if (gamePhase === GamePhase.Phase1_LandGrab) {
+        // FIX: Replaced obsolete 'Phase1_LandGrab' with the new sub-phase 'Phase1_PickField' to align with the updated game logic.
+        if (gamePhase === GamePhase.Phase1_PickField) {
             const selectedFieldIds = Object.values(phase1Selections).filter(id => id !== null);
             isDisabled = selectedFieldIds.includes(field.id) || !!field.ownerId || field.type === FieldType.Black;
             if (!isDisabled && field.type === FieldType.Neutral) {

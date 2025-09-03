@@ -19,8 +19,8 @@ export const createInitialGameState = (playerCount: number, user: User, isOnline
         }
     });
     
-    // The radius is now always 2 to ensure enough neutral fields for Phase 1 (playerCount * 3)
-    const radius = 2;
+    // The radius is now always 3 to create a larger game board.
+    const radius = 3;
     let board: Field[] = [];
     let fieldIdCounter = 0;
 
@@ -30,10 +30,10 @@ export const createInitialGameState = (playerCount: number, user: User, isOnline
       }
     }
 
-    // Base positions are adjusted for the larger map, ensuring good separation.
+    // Base positions are adjusted for the radius 3 map.
     const basePositions = playerCount <= 2
-      ? [{ q: 2, r: 0 }, { q: -2, r: 0 }]
-      : [{ q: 2, r: 0 }, { q: -2, r: 0 }, { q: 1, r: -2 }, { q: -1, r: 2 }];
+      ? [{ q: 3, r: 0 }, { q: -3, r: 0 }]
+      : [{ q: 3, r: 0 }, { q: -3, r: 0 }, { q: 0, r: 3 }, { q: 0, r: -3 }];
 
     const assignedBaseCoords = new Set<string>();
 
