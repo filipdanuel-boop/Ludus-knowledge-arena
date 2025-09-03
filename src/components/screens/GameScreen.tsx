@@ -238,7 +238,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
                     const langForTiebreaker = gameState.players.find(p => p.id === defenderId)?.isBot ? 'cs' : user.language;
                     const tieBreakerQuestion = await generateOpenEndedQuestion(gameState.activeQuestion!.category, gameState.questionHistory, langForTiebreaker, 'hard');
                     setEventNotification({ type: 'warning', message: t('tieBreaker') });
-                    dispatch({ type: 'RESOLVE_TURN', payload: { tieBreakerQuestion } });
+                    dispatch({ type: 'RESOLVE_TURN', payload: { tieBreakerQuestion: tieBreakerQuestion || undefined } });
                 }, 1500);
             } else {
                 logicTimeoutRef.current = window.setTimeout(() => {
@@ -315,14 +315,12 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
     }, [gameState.gamePhase, gameState.phase1Selections, gameState.board, gameState.players, gameState.questionHistory, user.language, dispatch]);
     
      React.useEffect(() => {
-// FIX: Use GamePhase enum for comparison instead of string literal
         if (gameState.gamePhase === GamePhase.TransitionToPhase1) {
             const timer = setTimeout(() => {
                 dispatch({ type: 'SET_STATE', payload: { gamePhase: GamePhase.Phase1_PickField, phaseStartTime: Date.now() }});
             }, 3000);
             return () => clearTimeout(timer);
         }
-// FIX: Use GamePhase enum for comparison instead of string literal
         if (gameState.gamePhase === GamePhase.TransitionToPhase2) {
             const timer = setTimeout(() => {
                  const attackers = getAttackers(gameState.players);
@@ -379,7 +377,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
     
     const { gamePhase } = gameState;
     if (gamePhase === GamePhase.TransitionToPhase1 || gamePhase === GamePhase.TransitionToPhase2) {
-// FIX: Use enum values as keys for object lookup to prevent runtime errors.
         const phaseInfo = {
             [GamePhase.TransitionToPhase1]: { number: 1, name: t('phaseLandGrab') },
             [GamePhase.TransitionToPhase2]: { number: 2, name: t('phaseAttacks') }
