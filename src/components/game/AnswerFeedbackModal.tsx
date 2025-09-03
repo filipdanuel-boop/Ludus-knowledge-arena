@@ -1,8 +1,7 @@
-
 import * as React from 'react';
 import { GameState, Theme } from '../../types';
 import { themes } from '../../themes';
-import { useTranslation } from '../../i1n/LanguageContext';
+import { useTranslation } from '../../i18n/LanguageContext';
 
 export const AnswerFeedbackModal: React.FC<{ result: GameState['answerResult']; themeConfig: typeof themes[Theme] }> = ({ result, themeConfig }) => {
     const { t } = useTranslation();
