@@ -130,7 +130,8 @@ export const decideBotAction = (gameState: GameState): { action: 'HEAL' | 'ATTAC
         } else {
             let availableCategories = CATEGORIES.filter(c => !bot.usedAttackCategories.includes(c));
             if (availableCategories.length === 0) {
-                availableCategories = [...CATEGORIES]; // Reset for selection
+                // All categories used, they will be reset. Pick any.
+                availableCategories = [...CATEGORIES];
             }
             category = availableCategories[Math.floor(Math.random() * availableCategories.length)];
         }
@@ -185,7 +186,7 @@ export const decideBotAction = (gameState: GameState): { action: 'HEAL' | 'ATTAC
     possibleActions.sort((a, b) => b.score - a.score);
 
     let chosenAction = possibleActions[0];
-    if (difficulty === 'medium' && Math.random() > 0.65) { // 35% chance to pick a random (but still valid) action
+    if (difficulty === 'medium' && Math.random() > 0.65) { // 35% chance to pick a non-optimal (but still valid) action
         chosenAction = possibleActions[Math.floor(Math.random() * possibleActions.length)];
     }
 
@@ -207,7 +208,8 @@ export const decideBotAction = (gameState: GameState): { action: 'HEAL' | 'ATTAC
         } else {
             let availableCategories = CATEGORIES.filter(c => !bot.usedAttackCategories.includes(c));
             if (availableCategories.length === 0) {
-                availableCategories = [...CATEGORIES]; // Conceptually reset for this turn's choice
+                // All categories used, they will be reset. Pick any.
+                availableCategories = [...CATEGORIES];
             }
             category = availableCategories[Math.floor(Math.random() * availableCategories.length)];
             questionDifficulty = 'easy';

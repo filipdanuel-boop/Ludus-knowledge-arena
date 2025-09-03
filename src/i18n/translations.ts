@@ -1,3 +1,4 @@
+
 import { Language } from '../types';
 
 type Translations = {
@@ -164,6 +165,15 @@ export const translations: Record<Language, Translations> = {
     levelHeader: 'Level',
     xpHeader: 'XP',
     youBadge: 'Vy',
+
+    // New Event/Timer keys
+    phase1End: 'Fáze 1 skončila! Začínají útoky!',
+    tieBreaker: 'ROZSTŘEL!',
+    baseUnderAttackWarning: 'VAŠE ZÁKLADNA JE POD ÚTOKEM!',
+    blackFieldSuccess: 'Černé pole obsazeno!',
+    phase1TimerPickField: 'Vyberte pole!',
+    phase1TimerShowQuestion: 'Připravte se na otázku!',
+    timeUp: 'Čas vypršel!',
   },
   en: {
     // General
@@ -324,6 +334,15 @@ export const translations: Record<Language, Translations> = {
     levelHeader: 'Level',
     xpHeader: 'XP',
     youBadge: 'You',
+
+    // New Event/Timer keys
+    phase1End: 'Phase 1 has ended! Attacks begin!',
+    tieBreaker: 'TIE-BREAKER!',
+    baseUnderAttackWarning: 'YOUR BASE IS UNDER ATTACK!',
+    blackFieldSuccess: 'Black field captured!',
+    phase1TimerPickField: 'Select a field!',
+    phase1TimerShowQuestion: 'Prepare for the question!',
+    timeUp: 'Time\'s up!',
   },
   de: {
     // General
@@ -484,6 +503,15 @@ export const translations: Record<Language, Translations> = {
     levelHeader: 'Level',
     xpHeader: 'XP',
     youBadge: 'Du',
+
+    // New Event/Timer keys
+    phase1End: 'Phase 1 beendet! Angriffe beginnen!',
+    tieBreaker: 'STICHFRAGE!',
+    baseUnderAttackWarning: 'DEINE BASIS WIRD ANGEGRIFFEN!',
+    blackFieldSuccess: 'Schwarzes Feld erobert!',
+    phase1TimerPickField: 'Wähle ein Feld!',
+    phase1TimerShowQuestion: 'Bereite dich auf die Frage vor!',
+    timeUp: 'Zeit abgelaufen!',
   },
   es: {
     // General
@@ -644,5 +672,14 @@ export const translations: Record<Language, Translations> = {
     levelHeader: 'Nivel',
     xpHeader: 'XP',
     youBadge: 'Tú',
+    
+    // New Event/Timer keys
+    phase1End: '¡La Fase 1 ha terminado! ¡Comienzan los ataques!',
+    tieBreaker: '¡DESEMPATE!',
+    baseUnderAttackWarning: '¡TU BASE ESTÁ BAJO ATAQUE!',
+    blackFieldSuccess: '¡Campo negro capturado!',
+    phase1TimerPickField: '¡Selecciona un campo!',
+    phase1TimerShowQuestion: '¡Prepárate para la pregunta!',
+    timeUp: '¡Se acabó el tiempo!',
   },
 };
