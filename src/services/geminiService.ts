@@ -22,8 +22,9 @@ const getQuestionFromBank = (category: Category, history: string[], difficulty: 
     if (availableQuestions.length > 0) {
         return availableQuestions[Math.floor(Math.random() * availableQuestions.length)];
     }
-    // Fallback to all questions if all have been used
-    return categoryQuestions[Math.floor(Math.random() * categoryQuestions.length)];
+    
+    // If no unique questions are available, return null to prevent repetition.
+    return null;
 };
 
 const getOpenEndedQuestionFromBank = (category: Category, history: string[], difficulty: QuestionDifficulty): Question | null => {
@@ -34,7 +35,9 @@ const getOpenEndedQuestionFromBank = (category: Category, history: string[], dif
      if (availableQuestions.length > 0) {
         return availableQuestions[Math.floor(Math.random() * availableQuestions.length)];
     }
-    return categoryQuestions[Math.floor(Math.random() * categoryQuestions.length)];
+
+    // If no unique questions are available, return null to prevent repetition.
+    return null;
 };
 
 const translateQuestionPayload = async (question: Question, targetLang: Language): Promise<Question> => {

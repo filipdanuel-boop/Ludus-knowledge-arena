@@ -104,7 +104,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
     
             if (field.ownerId === currentPlayerFromState.id && field.type === 'PLAYER_BASE' && field.hp < field.maxHp) {
                  setIsProcessingQuestion(true);
-                 const question = await generateQuestion(field.category!, gameState.questionHistory, user.language, 'medium');
+                 const question = await generateQuestion(field.category!, gameState.questionHistory, user.language, gameState.botDifficulty);
                  setIsProcessingQuestion(false);
                  if (question) {
                      dispatch({ type: 'SET_QUESTION', payload: { question, questionType: 'MULTIPLE_CHOICE', targetFieldId: fieldId, attackerId: currentPlayerFromState.id, isBaseAttack: false, isTieBreaker: false, actionType: 'HEAL', playerAnswers: { [currentPlayerFromState.id]: null }, startTime: Date.now(), category: field.category! } });
@@ -115,7 +115,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
             if (field.type === 'BLACK') {
                 setIsProcessingQuestion(true);
                 const randomCategory = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
-                const question = await generateQuestion(randomCategory, gameState.questionHistory, user.language, 'hard');
+                const question = await generateQuestion(randomCategory, gameState.questionHistory, user.language, gameState.botDifficulty);
                 setIsProcessingQuestion(false);
                 if (question) {
                      dispatch({ type: 'SET_QUESTION', payload: { question, questionType: 'MULTIPLE_CHOICE', targetFieldId: fieldId, attackerId: currentPlayerFromState.id, isBaseAttack: false, isTieBreaker: false, actionType: 'ATTACK', playerAnswers: { [currentPlayerFromState.id]: null }, startTime: Date.now(), category: randomCategory } });
@@ -132,7 +132,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
         
         setAttackTarget(null);
         setIsProcessingQuestion(true);
-        const question = await generateQuestion(category, gameState.questionHistory, user.language, 'medium');
+        const question = await generateQuestion(category, gameState.questionHistory, user.language, gameState.botDifficulty);
         setIsProcessingQuestion(false);
     
         if (question) {
@@ -201,12 +201,12 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
         dispatch({ type: 'SUBMIT_ANSWER', payload: { playerId: bot.id, answer: Math.random() < BOT_SUCCESS_RATES[gameState.botDifficulty] ? question.correctAnswer : "wrong", category: category! } });
 
         if (defender && !defender.isBot) {
-            // Human will answer via UI, which will trigger RESOLVE_TURN
+            // Human will answer via UI, which will trigger turn resolution
         } else {
             if (defender && defender.isBot) {
                  dispatch({ type: 'SUBMIT_ANSWER', payload: { playerId: defender.id, answer: Math.random() < BOT_SUCCESS_RATES[gameState.botDifficulty] ? question.correctAnswer : "wrong_2", category: category! } });
             }
-            setTimeout(() => dispatch({ type: 'RESOLVE_TURN' }), 2000);
+            // Turn resolution will be triggered by the useEffect below
         }
     }, [gameState, dispatch]);
 
@@ -247,22 +247,55 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
         }
     }, [gameState.gamePhase, gameState.phase1Selections, gameState.players, dispatch]);
 
+    // Effect for handling turn resolution and tie-breakers
     React.useEffect(() => {
-        if(logicTimeoutRef.current) clearTimeout(logicTimeoutRef.current);
+        if (logicTimeoutRef.current) clearTimeout(logicTimeoutRef.current);
 
-        const triggerAction = () => {
-            if (gameState.activeQuestion) {
-                 dispatch({ type: 'RESOLVE_TURN' });
+        const handleTurnResolution = async () => {
+            if (!gameState.activeQuestion) return;
+            
+            // Tie-breaker condition check
+            const { attackerId, defenderId, question, isBaseAttack, isTieBreaker, category } = gameState.activeQuestion;
+            if (defenderId && !isBaseAttack && !isTieBreaker) {
+                const isAttackerCorrect = normalizeAnswer(gameState.activeQuestion.playerAnswers[attackerId] || '') === normalizeAnswer(question.correctAnswer);
+                const isDefenderCorrect = normalizeAnswer(gameState.activeQuestion.playerAnswers[defenderId] || '') === normalizeAnswer(question.correctAnswer);
+
+                if (isAttackerCorrect && isDefenderCorrect) {
+                    setIsProcessingQuestion(true);
+                    const tieBreakerQuestion = await generateOpenEndedQuestion(category, gameState.questionHistory, user.language, 'hard');
+                    setIsProcessingQuestion(false);
+                    
+                    if (tieBreakerQuestion) {
+                        dispatch({
+                            type: 'SET_QUESTION',
+                            payload: {
+                                ...gameState.activeQuestion,
+                                question: tieBreakerQuestion,
+                                questionType: 'OPEN_ENDED',
+                                isTieBreaker: true,
+                                playerAnswers: { [attackerId]: null, [defenderId]: null },
+                                startTime: Date.now(),
+                            }
+                        });
+                    } else {
+                        dispatch({ type: 'RESOLVE_TURN' }); // Fallback if question generation fails
+                    }
+                    return; // End execution here, don't proceed to normal resolution
+                }
             }
+            // If not a tie-breaker, resolve normally
+            dispatch({ type: 'RESOLVE_TURN' });
         };
-        
-        // This effect now simply waits for all answers and resolves the turn.
-        // The complex tie-breaker logic is now handled entirely in `gameLogic.ts`.
-        if (gameState.activeQuestion && Object.values(gameState.activeQuestion.playerAnswers).every(ans => ans !== null)) {
-            logicTimeoutRef.current = window.setTimeout(triggerAction, 1500);
-        }
 
-    }, [gameState.activeQuestion, dispatch]);
+        if (gameState.activeQuestion && Object.values(gameState.activeQuestion.playerAnswers).every(ans => ans !== null)) {
+            logicTimeoutRef.current = window.setTimeout(handleTurnResolution, 1500);
+        }
+        
+        return () => {
+            if (logicTimeoutRef.current) clearTimeout(logicTimeoutRef.current);
+        }
+    }, [gameState.activeQuestion, gameState.questionHistory, user.language, dispatch]);
+
 
     React.useEffect(() => {
         if (botTurnTimeoutRef.current) clearTimeout(botTurnTimeoutRef.current);

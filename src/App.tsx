@@ -112,22 +112,26 @@ const AppContent = () => {
       if (gameState?.players && user) {
         const humanPlayer = gameState.players.find(p => !p.isBot);
         if(humanPlayer && gameState.matchStats[humanPlayer.id]) {
-            const playerStats = gameState.matchStats[humanPlayer.id];
-            const currentUserData = userService.loadUserData(user.email)!;
+            const currentUserData = userService.loadUserData(user.email);
             
-            currentUserData.xp += playerStats.xpEarned;
-            currentUserData.stats.totalCorrect += playerStats.correct;
-            currentUserData.stats.totalAnswered += playerStats.total;
-            
-            for(const category in playerStats.categories){
-                if (currentUserData.stats.categoryStats[category as Category]) {
-                    currentUserData.stats.categoryStats[category as Category].totalCorrect += playerStats.categories[category as Category].correct;
-                    currentUserData.stats.categoryStats[category as Category].totalAnswered += playerStats.categories[category as Category].total;
+            if (currentUserData) {
+                const playerStats = gameState.matchStats[humanPlayer.id];
+                currentUserData.xp += playerStats.xpEarned;
+                currentUserData.stats.totalCorrect += playerStats.correct;
+                currentUserData.stats.totalAnswered += playerStats.total;
+                
+                for(const category in playerStats.categories){
+                    if (currentUserData.stats.categoryStats[category as Category]) {
+                        currentUserData.stats.categoryStats[category as Category].totalCorrect += playerStats.categories[category as Category].correct;
+                        currentUserData.stats.categoryStats[category as Category].totalAnswered += playerStats.categories[category as Category].total;
+                    }
                 }
+                
+                userService.saveUserData(currentUserData);
+                setUser(currentUserData);
+            } else {
+                console.error(`Failed to load user data for ${user.email} after match.`);
             }
-            
-            userService.saveUserData(currentUserData);
-            setUser(currentUserData);
         }
       }
       dispatch({ type: 'SET_STATE', payload: { gamePhase: GamePhase.Setup }});

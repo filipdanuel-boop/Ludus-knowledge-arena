@@ -137,7 +137,7 @@ export type GameAction =
   | { type: 'CLEAR_QUESTION' }
   | { type: 'SUBMIT_ANSWER'; payload: { playerId: string; answer: string; category: Category } }
   | { type: 'RESOLVE_PHASE1_ROUND'; payload: { humanActionResult: 'win' | 'loss', fieldId: number } }
-  | { type: 'RESOLVE_TURN'; payload?: { tieBreakerQuestion?: Question } }
+  | { type: 'RESOLVE_TURN' }
   | { type: 'SET_ANSWER_FEEDBACK'; payload: GameState['answerResult'] }
   | { type: 'CLEAR_ANSWER_FEEDBACK' }
   | { type: 'SET_ELIMINATION_FEEDBACK'; payload: GameState['eliminationResult'] }

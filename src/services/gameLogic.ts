@@ -22,7 +22,8 @@ export const createInitialGameState = (playerCount: number, user: User, isOnline
         }
     });
     
-    const radius = playerCount <= 2 ? 1 : 2;
+    // The radius is now always 2 to ensure enough neutral fields for Phase 1 (playerCount * 3)
+    const radius = 2;
     let board: Field[] = [];
     let fieldIdCounter = 0;
 
@@ -32,8 +33,9 @@ export const createInitialGameState = (playerCount: number, user: User, isOnline
       }
     }
 
+    // Base positions are adjusted for the larger map, ensuring good separation.
     const basePositions = playerCount <= 2
-      ? [{ q: 1, r: -1 }, { q: -1, r: 1 }]
+      ? [{ q: 2, r: 0 }, { q: -2, r: 0 }]
       : [{ q: 2, r: 0 }, { q: -2, r: 0 }, { q: 1, r: -2 }, { q: -1, r: 2 }];
 
     const assignedBaseCoords = new Set<string>();
@@ -104,80 +106,81 @@ export const getAttackers = (players: Player[]): Player[] => {
 export const decideBotAction = (gameState: GameState): { action: 'HEAL' | 'ATTACK' | 'PASS', targetField?: Field, category?: Category, reason?: string, difficulty?: QuestionDifficulty } => {
     const bot = gameState.players[gameState.currentTurnPlayerIndex];
     const botBase = gameState.board.find(f => f.ownerId === bot.id && f.type === 'PLAYER_BASE');
+    const difficulty = gameState.botDifficulty;
 
-    // Priority 1: Heal if base is critically low.
-    if (botBase && botBase.hp < botBase.maxHp && (botBase.hp === 1 || Math.random() < 0.5)) {
+    // Heal decision based on difficulty
+    const shouldHeal = () => {
+        if (!botBase || botBase.hp === botBase.maxHp) return false;
+        if (difficulty === 'hard') return true;
+        if (difficulty === 'medium' && Math.random() < 0.5) return true;
+        if (difficulty === 'easy' && botBase.hp === 1) return true;
+        return false;
+    };
+    
+    if (shouldHeal()) {
         return { action: 'HEAL', targetField: botBase, category: botBase.category!, difficulty: 'medium' };
     }
     
-    // Priority 2: Attack other players.
-    const potentialTargets = gameState.board
-        .filter(f => f.ownerId !== bot.id && f.type !== 'NEUTRAL') // Can attack owned fields or black fields
-        .map(target => {
-            let score = 0;
-            const owner = gameState.players.find(p => p.id === target.ownerId);
-
-            // High priority for bases
-            if (target.type === 'PLAYER_BASE') {
-                score += 100;
-                // Extra points for low HP bases
-                score += (target.maxHp - target.hp) * 50;
-            }
-
-            // Priority for black fields (high risk/reward)
-            if (target.type === 'BLACK') {
-                score += 40;
-            }
-
-            // Prioritize weaker players
-            if (owner) {
-                const activePlayers = gameState.players.filter(p => !p.isEliminated);
-                const sortedPlayers = [...activePlayers].sort((a, b) => b.score - a.score);
-                const ownerRank = sortedPlayers.findIndex(p => p.id === owner.id); // 0 is highest score
-                if(ownerRank !== -1) {
-                    score += (activePlayers.length - 1 - ownerRank) * 20; // More points for lower ranked players
-                }
-            } else {
-                // It's a black field, give it a base priority
-                score += 10;
-            }
-            
-            // Add some randomness to avoid deterministic behavior
-            score += Math.random() * 15;
-
-            return { field: target, priority: score };
-        });
-
+    // Attack decision
+    const potentialTargets = gameState.board.filter(f => f.ownerId !== bot.id && f.type !== 'NEUTRAL');
     if (potentialTargets.length === 0) {
         return { action: 'PASS', reason: "Nebyly nalezeny žádné platné cíle." };
     }
 
-    // Select the target with the highest priority score
-    potentialTargets.sort((a, b) => b.priority - a.priority);
-    const bestTarget = potentialTargets[0].field;
+    let bestTarget: Field;
+
+    if (difficulty === 'easy') {
+        // Easy bot picks a random target
+        bestTarget = potentialTargets[Math.floor(Math.random() * potentialTargets.length)];
+    } else {
+        // Medium and Hard bots use a scoring system to find the best target
+        const scoredTargets = potentialTargets.map(target => {
+            let score = 0;
+            const owner = gameState.players.find(p => p.id === target.ownerId);
+
+            if (target.type === 'PLAYER_BASE') score += 100 + ((target.maxHp - target.hp) * 50); // Prioritize low HP bases
+            if (target.type === 'BLACK') score += 40;
+            if (owner) {
+                const activePlayers = gameState.players.filter(p => !p.isEliminated);
+                const sortedPlayers = [...activePlayers].sort((a, b) => b.score - a.score);
+                const ownerRank = sortedPlayers.findIndex(p => p.id === owner.id);
+                if(ownerRank !== -1) score += (activePlayers.length - 1 - ownerRank) * 20; // Prioritize weaker players
+            } else { score += 10; } // Base score for black fields
+            
+            score += Math.random() * 15; // Add randomness
+            return { field: target, priority: score };
+        });
+
+        scoredTargets.sort((a, b) => b.priority - a.priority);
+
+        if (difficulty === 'hard') {
+            bestTarget = scoredTargets[0].field; // Hard bot always picks the best
+        } else { // Medium bot
+            bestTarget = Math.random() < 0.6 ? scoredTargets[0].field : potentialTargets[Math.floor(Math.random() * potentialTargets.length)];
+        }
+    }
 
     const isBaseAttack = bestTarget.type === 'PLAYER_BASE';
     let category: Category;
-    let difficulty: QuestionDifficulty;
+    let questionDifficulty: QuestionDifficulty;
 
     if (isBaseAttack) {
         category = bestTarget.category!;
-        difficulty = 'hard';
+        questionDifficulty = 'hard';
     } else if (bestTarget.type === 'BLACK') {
         category = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
-        difficulty = 'hard';
-    } else { // Regular owned field
+        questionDifficulty = 'hard';
+    } else {
         let availableCategories = CATEGORIES.filter(c => !bot.usedAttackCategories.includes(c));
         if (availableCategories.length === 0) {
-            // All categories used, reset them for the bot by allowing all categories again.
-            // The actual state update will happen in the reducer.
+            bot.usedAttackCategories = [];
             availableCategories = [...CATEGORIES];
         }
         category = availableCategories[Math.floor(Math.random() * availableCategories.length)];
-        difficulty = 'medium';
+        questionDifficulty = 'medium';
     }
 
-    return { action: 'ATTACK', targetField: bestTarget, category, difficulty };
+    return { action: 'ATTACK', targetField: bestTarget, category, difficulty: questionDifficulty };
 };
 
 
@@ -202,13 +205,15 @@ const handleHealAction = (state: GameState) => {
 };
 
 const handleAttackAction = (state: GameState) => {
-    const { attackerId, defenderId, targetFieldId, playerAnswers, question, isBaseAttack, category } = state.activeQuestion!;
+    const { attackerId, defenderId, targetFieldId, playerAnswers, question, isBaseAttack, category, actionType } = state.activeQuestion!;
     const attacker = state.players.find(p => p.id === attackerId)!;
     const field = state.board.find(f => f.id === targetFieldId)!;
     
-    if (attacker.isBot && !isBaseAttack) {
+    // Track used attack categories for all players to ensure variety
+    if (!isBaseAttack && actionType === 'ATTACK') {
         let availableCategories = CATEGORIES.filter(c => !attacker.usedAttackCategories.includes(c));
         if (availableCategories.length === 0) {
+            // If all categories have been used, reset the list and add the current one.
             attacker.usedAttackCategories = [category];
         } else {
             attacker.usedAttackCategories.push(category);
@@ -223,7 +228,9 @@ const handleAttackAction = (state: GameState) => {
         if(!attacker.isBot && isAttackerCorrect) state.matchStats[attacker.id].xpEarned += XP_PER_CORRECT_ANSWER * XP_DIFFICULTY_MULTIPLIER[question.difficulty];
         if(!defender.isBot && isDefenderCorrect) state.matchStats[defender.id].xpEarned += XP_PER_CORRECT_ANSWER * XP_DIFFICULTY_MULTIPLIER[question.difficulty];
 
-        if (isAttackerCorrect && isDefenderCorrect) {
+        if (isAttackerCorrect && isDefenderCorrect && !state.activeQuestion!.isTieBreaker) {
+            // On a tie, the defender successfully defends the territory.
+            // The tie-breaker logic is now handled in the GameScreen component.
             state.gameLog.push(`${defender.name} ubránil své území v napínavém souboji!`);
         } else if (isAttackerCorrect) { // Attacker wins
             field.hp -= 1;
