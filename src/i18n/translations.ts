@@ -1,4 +1,3 @@
-
 import { Language } from '../types';
 
 type Translations = {
@@ -96,7 +95,7 @@ export const translations: Record<Language, Translations> = {
     rulesPhase1Title: 'Fáze 1: Zabírání území (3 kola)',
     rulesPhase1Desc: 'Všichni hráči si současně vybírají neutrální pole. Odpovězte správně, abyste pole zabrali a získali body.',
     rulesEliminationTitle: 'Vyřazení ze hry',
-    rulesEliminationDesc: 'Hráč je vyřazen, pokud jeho základna ztratí poslední život (HP), nebo pokud jeho skóre klesne pod nulu.',
+    rulesEliminationDesc: 'Hráč je vyřazen, pouze pokud jeho základna ztratí poslední život (HP).',
     
     // GameScreen & In-Game
     evaluating: 'Vyhodnocuji...',
@@ -111,6 +110,7 @@ export const translations: Record<Language, Translations> = {
     phaseLandGrab: 'Zabírání Území',
     phaseAttacks: 'Útoky',
     phaseGameOver: 'Konec Hry',
+    phase2StartLog: 'Fáze 2: Útoky začaly!',
     
     // Modals
     adWatching: 'Sledujete Reklamu',
@@ -118,7 +118,6 @@ export const translations: Record<Language, Translations> = {
     getCoins: 'Získat',
     correct: 'Správně!',
     incorrect: 'Špatně!',
-    correctAnswerWas: 'Správná odpověď byla: {0}',
     selectAttackCategory: 'Zvolte kategorii útoku',
     baseAttackMessage: 'Útočíte na základnu. Kategorie je dána.',
     noCategoriesAvailable: 'Nemáte k dispozici žádné další kategorie pro útok.',
@@ -265,7 +264,7 @@ export const translations: Record<Language, Translations> = {
     rulesPhase1Title: 'Phase 1: Land Grab (3 rounds)',
     rulesPhase1Desc: 'All players simultaneously choose neutral fields. Answer correctly to claim the field and earn points.',
     rulesEliminationTitle: 'Elimination',
-    rulesEliminationDesc: 'A player is eliminated if their base loses its last HP, or if their score drops below zero.',
+    rulesEliminationDesc: 'A player is eliminated only if their base loses its last HP.',
     
     // GameScreen & In-Game
     evaluating: 'Evaluating...',
@@ -280,6 +279,7 @@ export const translations: Record<Language, Translations> = {
     phaseLandGrab: 'Land Grab',
     phaseAttacks: 'Attacks',
     phaseGameOver: 'Game Over',
+    phase2StartLog: 'Phase 2: Attacks have begun!',
 
     // Modals
     adWatching: 'Watching Ad',
@@ -287,7 +287,6 @@ export const translations: Record<Language, Translations> = {
     getCoins: 'Claim',
     correct: 'Correct!',
     incorrect: 'Incorrect!',
-    correctAnswerWas: 'The correct answer was: {0}',
     selectAttackCategory: 'Select Attack Category',
     baseAttackMessage: 'You are attacking a base. The category is set.',
     noCategoriesAvailable: 'You have no more attack categories available.',
@@ -334,7 +333,7 @@ export const translations: Record<Language, Translations> = {
     levelHeader: 'Level',
     xpHeader: 'XP',
     youBadge: 'You',
-
+    
     // New Event/Timer keys
     phase1End: 'Phase 1 has ended! Attacks begin!',
     tieBreaker: 'TIE-BREAKER!',
@@ -434,7 +433,7 @@ export const translations: Record<Language, Translations> = {
     rulesPhase1Title: 'Phase 1: Landerwerb (3 Runden)',
     rulesPhase1Desc: 'Alle Spieler wählen gleichzeitig neutrale Felder. Antworte richtig, um das Feld zu beanspruchen und Punkte zu sammeln.',
     rulesEliminationTitle: 'Eliminierung',
-    rulesEliminationDesc: 'Ein Spieler scheidet aus, wenn seine Basis den letzten HP verliert oder sein Punktestand unter null fällt.',
+    rulesEliminationDesc: 'Ein Spieler scheidet nur aus, wenn seine Basis den letzten HP verliert.',
     
     // GameScreen & In-Game
     evaluating: 'Werte aus...',
@@ -449,6 +448,7 @@ export const translations: Record<Language, Translations> = {
     phaseLandGrab: 'Landerwerb',
     phaseAttacks: 'Angriffe',
     phaseGameOver: 'Spiel vorbei',
+    phase2StartLog: 'Phase 2: Die Angriffe haben begonnen!',
 
     // Modals
     adWatching: 'Werbung ansehen',
@@ -456,7 +456,6 @@ export const translations: Record<Language, Translations> = {
     getCoins: 'Einfordern',
     correct: 'Richtig!',
     incorrect: 'Falsch!',
-    correctAnswerWas: 'Die richtige Antwort war: {0}',
     selectAttackCategory: 'Angriffskategorie wählen',
     baseAttackMessage: 'Du greifst eine Basis an. Die Kategorie ist festgelegt.',
     noCategoriesAvailable: 'Du hast keine weiteren Angriffskategorien zur Verfügung.',
@@ -603,7 +602,7 @@ export const translations: Record<Language, Translations> = {
     rulesPhase1Title: 'Fase 1: Conquista de Tierras (3 rondas)',
     rulesPhase1Desc: 'Todos los jugadores eligen simultáneamente campos neutrales. Responde correctamente para reclamar el campo y ganar puntos.',
     rulesEliminationTitle: 'Eliminación',
-    rulesEliminationDesc: 'Un jugador es eliminado si su base pierde su último HP, o si su puntuación cae por debajo de cero.',
+    rulesEliminationDesc: 'Un jugador es eliminado solo si su base pierde su último HP.',
     
     // GameScreen & In-Game
     evaluating: 'Evaluando...',
@@ -618,6 +617,7 @@ export const translations: Record<Language, Translations> = {
     phaseLandGrab: 'Conquista de Tierras',
     phaseAttacks: 'Ataques',
     phaseGameOver: 'Fin del Juego',
+    phase2StartLog: '¡Fase 2: Los ataques han comenzado!',
 
     // Modals
     adWatching: 'Viendo Anuncio',
@@ -625,7 +625,6 @@ export const translations: Record<Language, Translations> = {
     getCoins: 'Reclamar',
     correct: '¡Correcto!',
     incorrect: '¡Incorrecto!',
-    correctAnswerWas: 'La respuesta correcta era: {0}',
     selectAttackCategory: 'Seleccionar Categoría de Ataque',
     baseAttackMessage: 'Estás atacando una base. La categoría está definida.',
     noCategoriesAvailable: 'No tienes más categorías de ataque disponibles.',

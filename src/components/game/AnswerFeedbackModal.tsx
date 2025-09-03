@@ -6,14 +6,9 @@ import { useTranslation } from '../../i18n/LanguageContext';
 export const AnswerFeedbackModal: React.FC<{ result: GameState['answerResult']; themeConfig: typeof themes[Theme] }> = ({ result, themeConfig }) => {
     const { t } = useTranslation();
 
-    // CRITICAL FIX: The internal timer was removed to prevent race conditions.
-    // The parent GameScreen component now controls the lifecycle of this modal
-    // by clearing the `answerResult` state after a delay. This makes the state
-    // management more predictable and robust.
-
     if (!result) return null;
     
-    const { isCorrect, correctAnswer } = result;
+    const { isCorrect } = result;
     const animationClass = isCorrect ? 'animate-flash-green' : 'animate-shake';
     
     return (
@@ -22,9 +17,6 @@ export const AnswerFeedbackModal: React.FC<{ result: GameState['answerResult']; 
                 <h2 className={`text-5xl font-bold mb-4 ${isCorrect ? 'text-green-400' : 'text-red-400'}`}>
                     {isCorrect ? t('correct') : t('incorrect')}
                 </h2>
-                {!isCorrect && (
-                    <p className="text-xl text-gray-300">{t('correctAnswerWas', '')} <span className={`font-bold ${themeConfig.accentTextLight}`}>{correctAnswer}</span></p>
-                )}
             </div>
         </div>
     );

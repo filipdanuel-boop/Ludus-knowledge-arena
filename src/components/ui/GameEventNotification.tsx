@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 
 export const GameEventNotification: React.FC<{ type: 'info' | 'success' | 'warning' | 'danger', message: string }> = ({ type, message }) => {

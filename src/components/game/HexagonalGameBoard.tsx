@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { Field, Player, GamePhase, FieldType, GameState, Theme } from '../../types';
 import { PLAYER_COLOR_HEX } from '../../constants';
@@ -73,7 +72,6 @@ export const HexagonalGameBoard: React.FC<HexagonalGameBoardProps> = ({ gameStat
             stroke = '#4b5563';
         }
 
-        // FIX: Replaced obsolete 'Phase1_LandGrab' with the new sub-phase 'Phase1_PickField' to align with the updated game logic.
         if (gamePhase === GamePhase.Phase1_PickField) {
             const selectedFieldIds = Object.values(phase1Selections).filter(id => id !== null);
             isDisabled = selectedFieldIds.includes(field.id) || !!field.ownerId || field.type === FieldType.Black;

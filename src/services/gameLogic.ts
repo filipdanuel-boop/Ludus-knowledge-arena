@@ -19,7 +19,6 @@ export const createInitialGameState = (playerCount: number, user: User, isOnline
         }
     });
     
-    // The radius is now always 3 to create a larger game board.
     const radius = 3;
     let board: Field[] = [];
     let fieldIdCounter = 0;
@@ -30,7 +29,6 @@ export const createInitialGameState = (playerCount: number, user: User, isOnline
       }
     }
 
-    // Base positions are adjusted for the radius 3 map.
     const basePositions = playerCount <= 2
       ? [{ q: 3, r: 0 }, { q: -3, r: 0 }]
       : [{ q: 3, r: 0 }, { q: -3, r: 0 }, { q: 0, r: 3 }, { q: 0, r: -3 }];
@@ -51,7 +49,6 @@ export const createInitialGameState = (playerCount: number, user: User, isOnline
 
     const neutralFields = board.filter(f => !assignedBaseCoords.has(`${f.q},${f.r}`));
     
-    // Shuffle categories for neutral fields
     const shuffledCategories = [...CATEGORIES].sort(() => 0.5 - Math.random());
 
     neutralFields.forEach((field, i) => {
@@ -77,8 +74,7 @@ export const createInitialGameState = (playerCount: number, user: User, isOnline
     return {
         players,
         board: board.filter(f => f.type !== FieldType.Empty),
-        // FIX: Start in the new `Phase1_PickField` sub-phase.
-        gamePhase: GamePhase.Phase1_PickField,
+        gamePhase: GamePhase.TransitionToPhase1,
         currentTurnPlayerIndex: 0,
         round: 1,
         gameLog: [`Hra začala s ${playerCount} hráči.`],
@@ -86,6 +82,7 @@ export const createInitialGameState = (playerCount: number, user: User, isOnline
         winners: null,
         phase1Selections: {},
         gameStartTime: Date.now(),
+        phaseStartTime: Date.now(),
         answerResult: null,
         eliminationResult: null,
         questionHistory: user.stats.answeredQuestions || [],
@@ -104,15 +101,13 @@ export const getAttackers = (players: Player[]): Player[] => {
     return sortedPlayers.slice(0, attackerCount);
 };
 
-// --- Bot Decision Making ---
 export const decideBotAction = (gameState: GameState): { action: 'HEAL' | 'ATTACK' | 'PASS', targetField?: Field, category?: Category, reason?: string, difficulty?: QuestionDifficulty } => {
     const bot = gameState.players[gameState.currentTurnPlayerIndex];
     const difficulty = gameState.botDifficulty;
 
-    // --- Easy Bot: Simple, random logic ---
     if (difficulty === 'easy') {
         const botBase = gameState.board.find(f => f.ownerId === bot.id && f.type === 'PLAYER_BASE');
-        if (botBase && botBase.hp < botBase.maxHp && Math.random() < 0.25) { // Lower chance to heal
+        if (botBase && botBase.hp < botBase.maxHp && Math.random() < 0.25) {
             return { action: 'HEAL', targetField: botBase, category: botBase.category!, difficulty: 'easy' };
         }
         const validTargets = gameState.board.filter(f => f.ownerId !== null && f.ownerId !== bot.id && f.type !== 'NEUTRAL');
@@ -130,7 +125,6 @@ export const decideBotAction = (gameState: GameState): { action: 'HEAL' | 'ATTAC
         } else {
             let availableCategories = CATEGORIES.filter(c => !bot.usedAttackCategories.includes(c));
             if (availableCategories.length === 0) {
-                // All categories used, they will be reset. Pick any.
                 availableCategories = [...CATEGORIES];
             }
             category = availableCategories[Math.floor(Math.random() * availableCategories.length)];
@@ -138,18 +132,15 @@ export const decideBotAction = (gameState: GameState): { action: 'HEAL' | 'ATTAC
         return { action: 'ATTACK', targetField, category, difficulty: questionDifficulty };
     }
 
-    // --- Medium & Hard Bots: Scored, strategic logic ---
     const possibleActions: { score: number; action: 'HEAL' | 'ATTACK'; targetField: Field }[] = [];
     const botBase = gameState.board.find(f => f.ownerId === bot.id && f.type === 'PLAYER_BASE')!;
 
-    // 1. Evaluate Healing
     if (botBase.hp < botBase.maxHp) {
-        let healScore = (botBase.maxHp - botBase.hp) * 30; // 30 points per missing HP
-        if (botBase.hp === 1) healScore += 70; // High priority to avoid elimination
+        let healScore = (botBase.maxHp - botBase.hp) * 30;
+        if (botBase.hp === 1) healScore += 70;
         possibleActions.push({ score: healScore, action: 'HEAL', targetField: botBase });
     }
 
-    // 2. Evaluate Attacking
     const potentialTargets = gameState.board.filter(f => f.ownerId !== null && f.ownerId !== bot.id);
     const highestScore = Math.max(...gameState.players.filter(p => !p.isEliminated).map(p => p.score));
 
@@ -159,20 +150,17 @@ export const decideBotAction = (gameState: GameState): { action: 'HEAL' | 'ATTAC
 
         if (targetField.type === 'PLAYER_BASE') {
             attackScore += 60;
-            attackScore += (targetField.maxHp - targetField.hp) * 25; // Prioritize damaged bases heavily
+            attackScore += (targetField.maxHp - targetField.hp) * 25;
         } else if (targetField.type === 'BLACK') {
-            attackScore += 5; // Low priority
-        } else { // Neutral field owned by a player
+            attackScore += 5;
+        } else {
             attackScore += 15;
         }
 
         if (targetPlayer) {
-            // Prioritize players with low scores (closer to elimination)
             attackScore += (highestScore - targetPlayer.score) / 50;
-            // Prioritize players with fewer territories
             const territoryCount = gameState.board.filter(f => f.ownerId === targetPlayer.id).length;
             attackScore += (10 - territoryCount) * 3;
-            // Slightly prioritize human player
             if (!targetPlayer.isBot) attackScore *= 1.1;
         }
         possibleActions.push({ score: attackScore, action: 'ATTACK', targetField });
@@ -182,15 +170,13 @@ export const decideBotAction = (gameState: GameState): { action: 'HEAL' | 'ATTAC
         return { action: 'PASS', reason: "No valid actions found." };
     }
 
-    // Sort actions by score, descending
     possibleActions.sort((a, b) => b.score - a.score);
 
     let chosenAction = possibleActions[0];
-    if (difficulty === 'medium' && Math.random() > 0.65) { // 35% chance to pick a non-optimal (but still valid) action
+    if (difficulty === 'medium' && Math.random() > 0.65) {
         chosenAction = possibleActions[Math.floor(Math.random() * possibleActions.length)];
     }
 
-    // Determine category and question difficulty for the chosen action
     const { action, targetField } = chosenAction;
     let category: Category;
     let questionDifficulty: QuestionDifficulty;
@@ -198,17 +184,17 @@ export const decideBotAction = (gameState: GameState): { action: 'HEAL' | 'ATTAC
     if (action === 'HEAL') {
         category = targetField.category!;
         questionDifficulty = 'medium';
-    } else { // ATTACK
+    } else {
         if (targetField.type === 'PLAYER_BASE') {
             category = targetField.category!;
             questionDifficulty = 'hard';
         } else if (targetField.type === 'BLACK') {
-            category = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
+            const availableCategories = CATEGORIES.filter(c => !bot.usedAttackCategories.includes(c));
+            category = availableCategories.length > 0 ? availableCategories[Math.floor(Math.random() * availableCategories.length)] : CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
             questionDifficulty = 'medium';
         } else {
             let availableCategories = CATEGORIES.filter(c => !bot.usedAttackCategories.includes(c));
             if (availableCategories.length === 0) {
-                // All categories used, they will be reset. Pick any.
                 availableCategories = [...CATEGORIES];
             }
             category = availableCategories[Math.floor(Math.random() * availableCategories.length)];
@@ -218,9 +204,6 @@ export const decideBotAction = (gameState: GameState): { action: 'HEAL' | 'ATTAC
 
     return { action, targetField, category, difficulty: questionDifficulty };
 };
-
-
-// --- Turn Resolution Logic ---
 
 const handleHealAction = (state: GameState) => {
     const { attackerId, playerAnswers, question } = state.activeQuestion!;
@@ -244,14 +227,12 @@ const handleAttackAction = (state: GameState) => {
     const attacker = state.players.find(p => p.id === attackerId)!;
     const field = state.board.find(f => f.id === targetFieldId)!;
     
-    // Handle player vs player combat
     if (defenderId) {
         const defender = state.players.find(p => p.id === defenderId)!;
         const isAttackerCorrect = normalizeAnswer(playerAnswers[attackerId] || "") === normalizeAnswer(question.correctAnswer);
         const isDefenderCorrect = normalizeAnswer(playerAnswers[defenderId] || "") === normalizeAnswer(question.correctAnswer);
         
-        // Resolve combat
-        if (isAttackerCorrect && !isDefenderCorrect) { // Attacker wins
+        if (isAttackerCorrect && !isDefenderCorrect) {
             field.hp -= 1;
             if (isBaseAttack) {
                 attacker.score += POINTS.ATTACK_DAMAGE;
@@ -263,23 +244,22 @@ const handleAttackAction = (state: GameState) => {
                 defender.score += POINTS.ATTACK_LOSS_DEFENDER;
                 state.gameLog.push(`${attacker.name} dobyl území od hráče ${defender.name}!`);
             }
-        } else if (!isAttackerCorrect && isDefenderCorrect) { // Defender wins
+        } else if (!isAttackerCorrect && isDefenderCorrect) {
             attacker.score += POINTS.ATTACK_LOSS_ATTACKER;
             if (!isBaseAttack) defender.score += POINTS.ATTACK_WIN_DEFENDER;
             state.gameLog.push(`${defender.name} ubránil své území.`);
-        } else if (isAttackerCorrect && isDefenderCorrect) { // Both correct (Tie)
-            if(isBaseAttack) { // Base attacks don't have tie-breakers, defender wins
+        } else if (isAttackerCorrect && isDefenderCorrect) {
+            if(isBaseAttack) {
                  state.gameLog.push(`${defender.name} ubránil svou základnu v napínavém souboji!`);
-            } else { // Successful defense, no points change unless it was a tie-breaker
+            } else {
                 state.gameLog.push(`Souboj mezi ${attacker.name} a ${defender.name} skončil remízou! Území bylo ubráněno.`);
             }
-        } else { // Both wrong
+        } else {
             attacker.score += POINTS.ATTACK_LOSS_ATTACKER;
             state.gameLog.push(`Útok hráče ${attacker.name} se nezdařil, oba odpověděli špatně.`);
         }
-    } else { // Handle attacking neutral/black field
+    } else {
         const isAttackerCorrect = normalizeAnswer(playerAnswers[attackerId] || "") === normalizeAnswer(question.correctAnswer);
-        // FIX: Store field type before modifying it to prevent incorrect logic.
         const wasBlackField = field.type === FieldType.Black;
         if (isAttackerCorrect) {
             field.ownerId = attackerId;
@@ -301,7 +281,6 @@ const checkForEliminations = (state: GameState): GameState => {
     const attacker = state.players.find(p => p.id === attackerId)!;
     const field = state.board.find(f => f.id === targetFieldId)!;
     
-    // Check for base destruction elimination
     if (isBaseAttack && field.hp <= 0) {
         const defender = state.players.find(p => p.id === field.ownerId)!;
         if (!defender.isEliminated) {
@@ -314,19 +293,6 @@ const checkForEliminations = (state: GameState): GameState => {
             state.board.forEach(f => { if (f.ownerId === defender.id) f.ownerId = attacker.id; });
         }
     }
-
-    // Check for negative score elimination for all players
-    state.players.forEach(p => {
-        if (!p.isEliminated && p.score < 0) {
-            p.isEliminated = true;
-            state.eliminationResult = { eliminatedPlayerName: p.name, attackerName: 'Záporné skóre' };
-            state.gameLog.push(`${p.name} byl vyřazen kvůli záporným bodům!`);
-            state.board.forEach(f => {
-                if (f.ownerId === p.id && f.type !== FieldType.PlayerBase) { f.ownerId = null; f.type = FieldType.Black; }
-            });
-        }
-    });
-
     return state;
 };
 
@@ -345,7 +311,6 @@ const advanceTurnAndRound = (state: GameState): GameState => {
     const currentAttacker = state.players[state.currentTurnPlayerIndex];
     const currentAttackerInListIndex = currentAttackers.findIndex(p => p.id === currentAttacker.id);
 
-    // If the current player wasn't an attacker, or was the last one, advance the round
     if (currentAttackerInListIndex === -1 || currentAttackerInListIndex === currentAttackers.length - 1 || currentAttackers.length === 0) {
         state.round += 1;
         if (state.round > PHASE_DURATIONS.PHASE2_ROUNDS) {
@@ -361,12 +326,12 @@ const advanceTurnAndRound = (state: GameState): GameState => {
             const nextRoundAttackers = getAttackers(state.players);
             if (nextRoundAttackers.length > 0) {
                 state.currentTurnPlayerIndex = state.players.findIndex(p => p.id === nextRoundAttackers[0].id);
-            } else { // No one can attack, game ends
+            } else {
                  state.gamePhase = GamePhase.GameOver;
                  state.winners = activePlayers;
             }
         }
-    } else { // Move to the next attacker in the current list
+    } else {
         const nextAttacker = currentAttackers[currentAttackerInListIndex + 1];
         state.currentTurnPlayerIndex = state.players.findIndex(p => p.id === nextAttacker.id);
     }
@@ -404,19 +369,23 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
 
         case 'SET_PHASE1_SELECTION': {
             if (!state) return null;
-            const newState = {
-                ...state,
-                phase1Selections: { ...state.phase1Selections, [action.payload.playerId]: action.payload.fieldId }
-            };
-
-            const activePlayers = newState.players.filter(p => !p.isEliminated);
-            const allPlayersSelected = activePlayers.every(p => newState.phase1Selections?.[p.id] != null);
+            const updatedSelections = { ...state.phase1Selections, [action.payload.playerId]: action.payload.fieldId };
+            const activePlayers = state.players.filter(p => !p.isEliminated);
+            const allPlayersSelected = activePlayers.every(p => updatedSelections[p.id] != null);
 
             if (allPlayersSelected) {
-                newState.gamePhase = GamePhase.Phase1_ShowQuestion;
+                return {
+                    ...state,
+                    phase1Selections: updatedSelections,
+                    gamePhase: GamePhase.Phase1_ShowQuestion,
+                    phaseStartTime: Date.now(),
+                };
             }
-
-            return newState;
+            
+            return {
+                ...state,
+                phase1Selections: updatedSelections,
+            };
         }
 
         case 'SET_QUESTION': {
@@ -426,13 +395,12 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
             const newState = JSON.parse(JSON.stringify(state));
             const attacker = newState.players.find((p: Player) => p.id === attackerId);
 
-            // FAIRNESS FIX: Track used attack categories for ALL players and reset when full.
             if (attacker && actionType === 'ATTACK' && !isBaseAttack && category) {
                 if (!attacker.usedAttackCategories.includes(category)) {
                     attacker.usedAttackCategories.push(category);
                 }
                 if (attacker.usedAttackCategories.length === CATEGORIES.length) {
-                    attacker.usedAttackCategories = []; // Reset for next turn
+                    attacker.usedAttackCategories = [];
                 }
             }
             
@@ -473,7 +441,6 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
                 }
             }
 
-            // FIX: Transition to the next sub-phase after an answer in Phase 1.
             let nextPhase = state.gamePhase;
             if (state.gamePhase === GamePhase.Phase1_ShowQuestion) {
                 const allAnswered = Object.values(updatedActiveQuestion.playerAnswers).every(ans => ans !== null);
@@ -515,7 +482,7 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
                 const botPlayer = newState.players.find((p: Player) => p.id === botId)!;
                 const botFieldIndex = newState.board.findIndex((f: Field) => f.id === botFieldId);
                 if (botFieldIndex !== -1 && newState.board[botFieldIndex].type === FieldType.Neutral && !newState.board[botFieldIndex].ownerId) {
-                     if (Math.random() < 0.7) { // Bot success rate in Phase 1
+                     if (Math.random() < 0.7) {
                         newState.board[botFieldIndex].ownerId = botId;
                         botPlayer.score += POINTS.PHASE1_CLAIM;
                         newState.gameLog.push(`${botPlayer.name} odpověděl správně a zabral pole.`);
@@ -528,19 +495,12 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
         
             newState.round += 1;
             if (newState.round > PHASE_DURATIONS.PHASE1_ROUNDS) {
-                newState.gamePhase = GamePhase.Phase2_Attacks;
+                newState.gamePhase = GamePhase.TransitionToPhase2;
                 newState.round = 1;
-                const attackers = getAttackers(newState.players);
-                if (attackers.length > 0) {
-                    newState.currentTurnPlayerIndex = newState.players.findIndex((p:Player) => p.id === attackers[0].id);
-                } else {
-                    newState.gamePhase = GamePhase.GameOver;
-                    newState.winners = newState.players.filter((p: Player) => !p.isEliminated);
-                }
-                newState.gameLog.push("--- Fáze 2: Útoky začaly! ---");
+                newState.gameLog.push("--- Fáze 1 skončila! ---");
             } else {
-                // FIX: Loop back to the start of the next Phase 1 round.
                 newState.gamePhase = GamePhase.Phase1_PickField;
+                newState.phaseStartTime = Date.now();
             }
         
             newState.activeQuestion = null;
@@ -573,7 +533,6 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
             return newState;
         }
         
-        // FIX: Implemented logic for auto-selecting a field on timeout.
         case 'AUTO_SELECT_FIELD': {
             if (!state || state.gamePhase !== GamePhase.Phase1_PickField) return state;
             const humanPlayer = state.players.find(p => !p.isBot);
@@ -593,7 +552,6 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
             newState.phase1Selections[humanPlayer.id] = selectedField.id;
             newState.gameLog.push(`${humanPlayer.name} did not select a field. One was chosen automatically.`);
             
-            // Now handle bot selections immediately
             const remainingFields = availableFields.filter(f => f.id !== selectedField.id);
             newState.players.filter((p: Player) => p.isBot && !p.isEliminated).forEach((bot: Player) => {
                 if (remainingFields.length > 0) {
@@ -604,12 +562,13 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
             });
 
             newState.gamePhase = GamePhase.Phase1_ShowQuestion;
+            newState.phaseStartTime = Date.now();
             return newState;
         }
 
         case 'SET_STATE':
             if (!state) return null;
-            if (action.payload.gamePhase === 'SETUP') return null; // Reset game
+            if (action.payload.gamePhase === 'SETUP') return null;
             return { ...state, ...action.payload };
 
         default:

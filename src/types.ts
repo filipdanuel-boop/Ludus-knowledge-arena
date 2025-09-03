@@ -12,11 +12,12 @@ export enum Category {
 
 export enum GamePhase {
   Setup = "SETUP",
-  // FIX: Added new sub-phases for phase 1 to align with game logic and fix type errors.
+  TransitionToPhase1 = "TRANSITION_TO_PHASE_1",
   Phase1_PickField = "Phase1_PickField",
   Phase1_ShowQuestion = "Phase1_ShowQuestion",
   Phase1_SelectionResolved = "Phase1_SelectionResolved",
   Phase1_RoundEnd = "Phase1_RoundEnd",
+  TransitionToPhase2 = "TRANSITION_TO_PHASE_2",
   Phase2_Attacks = "PHASE_2_ÚTOKY",
   Phase3_FinalShowdown = "PHASE_3_FINÁLE",
   GameOver = "GAME_OVER",
@@ -87,6 +88,7 @@ export interface GameState {
   winners: Player[] | null;
   phase1Selections?: Record<string, number | null>;
   gameStartTime: number; // Timestamp for total game duration
+  phaseStartTime?: number;
   answerResult: {
     playerId: string;
     isCorrect: boolean;
@@ -149,5 +151,4 @@ export type GameAction =
   | { type: 'UPDATE_PLAYERS'; payload: Player[] }
   | { type: 'PASS_BOT_TURN'; payload: { botId: string; reason: string } }
   | { type: 'SET_STATE'; payload: Partial<GameState> }
-  // FIX: Added 'AUTO_SELECT_FIELD' action type to support game logic.
   | { type: 'AUTO_SELECT_FIELD' };

@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { GamePhase, Theme } from '../../types';
 import { themes } from '../../themes';

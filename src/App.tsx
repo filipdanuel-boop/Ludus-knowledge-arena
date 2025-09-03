@@ -55,19 +55,26 @@ const AppContent = () => {
     setIsLanguageSet(true);
   };
 
+  // This effect now ONLY handles the initial login check.
   React.useEffect(() => {
     if (isLanguageSet) {
       const loggedInUser = userService.getLoggedInUser();
       if (loggedInUser) {
-          if(loggedInUser.language !== language) {
-              setLanguage(loggedInUser.language);
-          }
+        // When we find a logged-in user, their saved language is the source of truth.
+        // We update the language context to match it.
+        setLanguage(loggedInUser.language);
         setUser(loggedInUser);
-        setScreen('LOBBY'); // Navigate to lobby on auto-login
+        setScreen('LOBBY');
       }
     }
-  }, [isLanguageSet, language, setLanguage]);
+    // This effect should only run once when the language is initially set.
+    // The dependency array is intentionally incomplete to prevent re-running on language change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLanguageSet]);
 
+
+  // This effect is responsible for KEEPING the user object and localStorage
+  // in sync with the language context if the user changes it later.
   React.useEffect(() => {
       if (user && user.language !== language) {
           const updatedUser = { ...user, language };
