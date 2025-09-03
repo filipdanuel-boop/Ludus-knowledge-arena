@@ -47,7 +47,7 @@ export const QuestionModal: React.FC<{
                 <div>
                     <div className="flex justify-between items-start mb-4">
                         <div>
-                            <p className={`${themeConfig.accentText} text-sm mb-2`}>{isTieBreaker ? t('tiebreaker') : (isHealing ? t('repairingBase') : t('question'))}</p>
+                            <p className={`${themeConfig.accentText} text-sm mb-2`}>{isTieBreaker ? t('tieBreaker') : (isHealing ? t('repairingBase') : t('question'))}</p>
                             <h2 className="text-2xl font-bold">{activeQuestion.question.question}</h2>
                         </div>
                         {isAnswering && <TimerUI startTime={activeQuestion.startTime} timeLimit={ANSWER_TIME_LIMIT} onTimeout={onTimeout} themeConfig={themeConfig} />}

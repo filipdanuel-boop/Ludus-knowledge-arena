@@ -1,8 +1,6 @@
 import * as React from 'react';
 import { Analytics } from '@vercel/analytics/react';
-// FIX: Import 'Category' type to resolve 'Cannot find name' errors.
 import { User, Theme, GamePhase, Language, QuestionDifficulty, Category, Player } from './types';
-// FIX: Import constants to resolve 'Cannot find name' errors.
 import { BOT_NAMES, CATEGORIES } from './constants';
 import { gameReducer } from './services/gameLogic';
 import { themes } from './themes';
@@ -29,7 +27,6 @@ import { Spinner } from './components/ui/Spinner';
 
 type Screen = 'AUTH' | 'LOBBY' | 'ONLINE_LOBBY' | 'FINDING_MATCH' | 'GAME_SETUP' | 'RULES' | 'GAME' | 'PROFILE' | 'LEADERBOARD' | 'PRIVATE_LOBBY';
 
-// FIX: Hardcode metadata to resolve persistent module loading error
 const appMetadata = {
   "name": "LUDUS: Knowledge Arena",
   "description": "A strategic online trivia game where players conquer territories by answering questions. Compete in various modes, climb the ranks, and prove your knowledge in sports, culture, science, and more.",
@@ -56,24 +53,20 @@ const AppContent = () => {
   };
 
   React.useEffect(() => {
-    if (!isLanguageSet) return;
-    if (!user) {
-        const loggedInUser = userService.getLoggedInUser();
-        if (loggedInUser) {
-            setUser(loggedInUser);
+    if (!isLanguageSet || user) return;
+
+    const loggedInUser = userService.getLoggedInUser();
+    if (loggedInUser) {
+        // Sync language provider with user's saved language
+        if (loggedInUser.language !== language) {
             setLanguage(loggedInUser.language);
-            setScreen('LOBBY');
-        } else {
-            setScreen('AUTH');
         }
+        setUser(loggedInUser);
+        setScreen('LOBBY');
     } else {
-        if (user.language !== language) {
-            const updatedUser = { ...user, language };
-            setUser(updatedUser);
-            userService.saveUserData(updatedUser);
-        }
+        setScreen('AUTH');
     }
-  }, [isLanguageSet, user, language, setLanguage]);
+}, [isLanguageSet, user, language, setLanguage]);
 
   React.useEffect(() => {
     localStorage.setItem('ludus_theme', theme);
@@ -96,7 +89,6 @@ const AppContent = () => {
 
   const handleStartGame = (playerCount: number, botDifficulty: QuestionDifficulty) => {
     if (user) {
-        // This is a bit of a hack to create players for local game.
         const players: Player[] = Array.from({ length: playerCount }, (_, i) => ({
             id: i === 0 ? user.email : `bot-${i}`,
             name: i === 0 ? user.nickname : `Bot ${i}`,
@@ -179,7 +171,6 @@ const AppContent = () => {
                         isBot: i !== 0,
                          color: '', score: 0, coins: 0, mainBaseCategory: Category.Sport, usedAttackCategories: [], finalPoints: 0, isEliminated: false
                     }));
-                    // FIX: Removed 'isOnlineMode' as it's not a valid property in the dispatch payload.
                     dispatch({ type: 'INITIALIZE_GAME', payload: { players, user, botDifficulty: 'medium', allowedCategories: CATEGORIES } });
                     setScreen('GAME');
                 }

@@ -40,7 +40,7 @@ export const PhaseTimerUI: React.FC<PhaseTimerUIProps> = ({ phase, startTime, du
     const allowClicksThrough = phase === GamePhase.Phase1_PickField;
 
     return (
-        <div className={`fixed inset-0 z-40 flex flex-col items-center justify-center`}>
+        <div className={`fixed inset-0 z-40 flex flex-col items-center justify-center ${allowClicksThrough ? 'pointer-events-none' : ''}`}>
             <div 
                 className={`absolute inset-0 bg-black/70 animate-fade-in ${allowClicksThrough ? 'pointer-events-none' : ''}`}
             />

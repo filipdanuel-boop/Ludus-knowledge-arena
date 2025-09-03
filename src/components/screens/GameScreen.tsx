@@ -219,58 +219,37 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
         if (gamePhase === GamePhase.TransitionToPhase1 || gamePhase === GamePhase.TransitionToPhase2) {
             const nextPhase = gamePhase === GamePhase.TransitionToPhase1 ? GamePhase.Phase1_PickField : GamePhase.Phase2_Attacks;
             const timer = setTimeout(() => {
-                if (nextPhase === GamePhase.Phase2_Attacks) {
-                    setEventNotification({ type: 'info', message: t('phase1End') });
-                    const attackers = getAttackers(gameState.players);
-                    const nextPlayerIndex = attackers.length > 0 ? gameState.players.findIndex(p => p.id === attackers[0].id) : 0;
-                    dispatch({ type: 'SET_STATE', payload: { gamePhase: nextPhase, currentTurnPlayerIndex: nextPlayerIndex, gameLog: [...gameState.gameLog, t('phase2StartLog')] }});
+                if (nextPhase === GamePhase.Phase1_PickField) {
+                     dispatch({ type: 'SET_STATE', payload: { gamePhase: nextPhase, phaseStartTime: Date.now() } });
                 } else {
-                    dispatch({ type: 'SET_STATE', payload: { gamePhase: nextPhase, phaseStartTime: Date.now() }});
+                     dispatch({ type: 'SET_STATE', payload: { gamePhase: nextPhase } });
                 }
-            }, 3000);
+            }, 3000); // 3-second transition screen
             return () => clearTimeout(timer);
         }
-
     }, [gameState, dispatch, user.language, isProcessingQuestion, t, currentPlayer]);
-
-
-    // Effect to update user stats/coins at game end
-    React.useEffect(() => {
-        if (gameState.gamePhase === GamePhase.GameOver) {
-            const humanPlayer = gameState.players.find(p => !p.isBot);
-            if (!humanPlayer) return;
-            
-            const userOnServer = userService.loadUserData(user.email);
-            if (userOnServer) {
-                const isWinner = gameState.winners?.some(w => w.id === humanPlayer.id) ?? false;
-                userOnServer.luduCoins = humanPlayer.coins + (isWinner ? (gameState.players.length - 1) * WIN_COINS_PER_PLAYER : 0);
-                userService.saveUserData(userOnServer);
-                setUser(userOnServer);
-            }
-        }
-    }, [gameState.gamePhase, gameState.players, gameState.winners, setUser, user.email]);
-    
 
     const humanPlayer = gameState.players.find(p => !p.isBot)!;
     const isHumanAnswering = gameState.activeQuestion?.playerAnswers.hasOwnProperty(humanPlayer.id);
+    const isHumanTurnToAttack = gameState.gamePhase === GamePhase.Phase2_Attacks && getAttackers(gameState.players).some(p => p.id === humanPlayer.id) && currentPlayer.id === humanPlayer.id;
 
     const getHeaderText = () => {
-        if (gameState.gamePhase === GamePhase.Phase2_CombatResolve) return t('evaluating');
+        if (gameState.answerResult) return t('evaluating');
         if (isProcessingQuestion) return t('loading');
         if (gameState.activeQuestion) {
-             if (isHumanAnswering && gameState.activeQuestion.playerAnswers[humanPlayer.id] === null) return t('answerTheQuestion');
-             return t('opponentTurn');
+            if (isHumanAnswering && gameState.activeQuestion.playerAnswers[humanPlayer.id] === null) return t('answerTheQuestion');
+            return t('opponentTurn');
         }
-        if (gameState.gamePhase.startsWith('Phase1')) {
-             if (gameState.phase1Selections?.[humanPlayer.id]) return t('waitingForPlayers');
-             return t('phase1SelectTerritory', gameState.round, PHASE_DURATIONS.PHASE1_ROUNDS);
+        if (gameState.gamePhase === GamePhase.Phase1_PickField) {
+            if (gameState.phase1Selections?.[humanPlayer.id]) return t('waitingForPlayers');
+            return t('phase1SelectTerritory', gameState.round, PHASE_DURATIONS.PHASE1_ROUNDS);
         }
-        if (gameState.gamePhase === GamePhase.Phase2_Attacks && getAttackers(gameState.players).some(p => p.id === humanPlayer.id) && currentPlayer.id === humanPlayer.id) {
+        if (isHumanTurnToAttack) {
             return t('yourTurnToAttack');
         }
-        return `${t('turnOfPrefix')}${currentPlayer?.name}`;
+        return <>{t('turnOfPrefix')}<span className={`font-bold text-${currentPlayer?.color}-400`}>{currentPlayer?.name}</span></>;
     };
-    
+
     const formatTime = (ms: number) => {
         const totalSeconds = Math.floor(ms / 1000);
         const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
@@ -278,46 +257,46 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
         return `${minutes}:${seconds}`;
     };
 
-    const phaseName = () => {
-        if(gameState.gamePhase.startsWith('Phase1')) return t('phaseLandGrab');
-        if(gameState.gamePhase.startsWith('Phase2')) return t('phaseAttacks');
-        if(gameState.gamePhase === GamePhase.GameOver) return t('phaseGameOver');
-        return '';
-    }
-    
-    const { gamePhase } = gameState;
-    if (gamePhase === GamePhase.TransitionToPhase1 || gamePhase === GamePhase.TransitionToPhase2) {
-        const phaseInfo = {
-            [GamePhase.TransitionToPhase1]: { number: 1, name: t('phaseLandGrab') },
-            [GamePhase.TransitionToPhase2]: { number: 2, name: t('phaseAttacks') }
-        }[gamePhase];
-        return <PhaseTransitionScreen phaseNumber={phaseInfo.number} phaseName={phaseInfo.name} themeConfig={themeConfig} />;
-    }
-
-    // Fix for category usage cycle bug
-    let availableCategories = CATEGORIES.filter(c => !currentPlayer?.usedAttackCategories.includes(c));
-    if (availableCategories.length === 0 && (currentPlayer?.usedAttackCategories.length || 0) > 0) {
-        availableCategories = [...CATEGORIES];
-    }
-
-    if (!currentPlayer) {
-      return <div className="min-h-screen flex items-center justify-center"><Spinner themeConfig={themeConfig} /></div>;
-    }
+    const phaseNameMapping: Record<string, string> = {
+        [GamePhase.Phase1_PickField]: t('phaseLandGrab'),
+        [GamePhase.Phase1_ShowQuestion]: t('phaseLandGrab'),
+        [GamePhase.Phase1_ResolveRound]: t('phaseLandGrab'),
+        [GamePhase.Phase2_Attacks]: t('phaseAttacks'),
+        [GamePhase.Phase2_CombatResolve]: t('phaseAttacks'),
+        [GamePhase.Phase2_Tiebreaker]: t('phaseAttacks'),
+        [GamePhase.GameOver]: t('phaseGameOver'),
+    };
+    const phaseName = phaseNameMapping[gameState.gamePhase] || gameState.gamePhase.replace(/_/g, ' ');
 
     return (
         <div className="min-h-screen flex flex-col">
-            {eventNotification && <GameEventNotification type={eventNotification.type} message={eventNotification.message} onDismiss={() => setEventNotification(null)} />}
             {gameState.gamePhase === GamePhase.GameOver && <GameOverScreen gameState={gameState} onBackToLobby={onBackToLobby} themeConfig={themeConfig} />}
+            
+            {gameState.gamePhase === GamePhase.TransitionToPhase1 && <PhaseTransitionScreen phaseNumber={1} phaseName={t('phaseLandGrab')} themeConfig={themeConfig} />}
+            {gameState.gamePhase === GamePhase.TransitionToPhase2 && <PhaseTransitionScreen phaseNumber={2} phaseName={t('phaseAttacks')} themeConfig={themeConfig} />}
+
+            {(gameState.gamePhase === GamePhase.Phase1_PickField || gameState.gamePhase === GamePhase.Phase1_ShowQuestion) && gameState.phaseStartTime && (
+                <PhaseTimerUI 
+                    phase={gameState.gamePhase} 
+                    startTime={gameState.phaseStartTime}
+                    duration={10}
+                    themeConfig={themeConfig}
+                />
+            )}
+
+            {eventNotification && <GameEventNotification {...eventNotification} onDismiss={() => setEventNotification(null)} />}
+
             <header className={`bg-gray-800/50 p-4 border-b ${themeConfig.accentBorder}`}>
                 <div className="flex justify-between items-center">
                     <div>
-                        <h1 className={`text-2xl font-bold ${themeConfig.accentText} capitalize`}>{t('phase')}: {phaseName()}</h1>
+                        <h1 className={`text-2xl font-bold ${themeConfig.accentText} capitalize`}>{t('phase')}: {phaseName}</h1>
                         <p className="text-gray-400">{t('round')}: {gameState.round}</p>
                     </div>
                     <div className={`text-2xl font-mono ${themeConfig.accentTextLight}`}>{formatTime(gameTime)}</div>
                     <div className="text-right"><h2 className="text-xl">{getHeaderText()}</h2></div>
                 </div>
             </header>
+
             <main className="flex-grow flex flex-col md:flex-row overflow-hidden">
                 <div className="flex-grow md:w-2/3 lg:w-3/4 order-2 md:order-1 relative">
                     <HexagonalGameBoard 
@@ -336,10 +315,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
                 </aside>
             </main>
             
-            {(gameState.gamePhase === GamePhase.Phase1_PickField || gameState.gamePhase === GamePhase.Phase1_ShowQuestion) && gameState.phaseStartTime && (
-                <PhaseTimerUI phase={gameState.gamePhase} startTime={gameState.phaseStartTime} duration={5} themeConfig={themeConfig} />
-            )}
-
             {(isProcessingQuestion || (gameState.activeQuestion && isHumanAnswering)) && (
                  <QuestionModal 
                     activeQuestion={gameState.activeQuestion} 
@@ -354,14 +329,11 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
             {attackTarget && (
                 <CategorySelectionModal 
                     isOpen={true}
-                    availableCategories={availableCategories}
+                    availableCategories={gameState.allowedCategories.filter(c => !currentPlayer?.usedAttackCategories.includes(c))}
                     isBaseAttack={attackTarget.isBaseAttack}
-                    onSelect={(category) => {
-                         if (attackTarget.isBaseAttack) {
-                           handleCategorySelect(gameState.board.find(f => f.id === attackTarget.targetFieldId)!.category!);
-                         } else {
-                           handleCategorySelect(category);
-                         }
+                    onSelect={async (category) => {
+                        if(attackTarget.isBaseAttack) await handleCategorySelect(gameState.board.find(f => f.id === attackTarget.targetFieldId)!.category!);
+                        else await handleCategorySelect(category);
                     }}
                     onClose={() => setAttackTarget(null)}
                     themeConfig={themeConfig}

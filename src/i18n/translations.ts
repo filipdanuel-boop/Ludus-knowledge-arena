@@ -71,7 +71,6 @@ export const translations: Record<Language, Translations> = {
     enterLobbyCode: 'Zadejte kód lobby...',
     join: 'Připojit se',
     selectCategories: 'Vyberte kategorie otázek (min. 1)',
-    waitingForPlayers: 'Čekání na hráče...',
     shareCode: 'Sdílejte tento kód s přáteli:',
     copyCode: 'Kopírovat kód',
     codeCopied: 'Kód zkopírován!',
@@ -147,7 +146,7 @@ export const translations: Record<Language, Translations> = {
     finalScore: 'Konečné skóre: {0} bodů',
     victoryBonus: 'Bonus za vítězství: +{0}',
     finalStandings: 'Konečné pořadí:',
-    // FIX: Removed duplicate 'tiebreaker' key. The camelCase 'tieBreaker' is used in the app.
+    tieBreaker: 'ROZSTŘEL!',
     repairingBase: 'Opravujete Základnu',
     question: 'Otázka',
     yourAnswer: 'Napište odpověď...',
@@ -181,7 +180,6 @@ export const translations: Record<Language, Translations> = {
 
     // New Event/Timer keys
     phase1End: 'Fáze 1 skončila! Začínají útoky!',
-    tieBreaker: 'ROZSTŘEL!',
     baseUnderAttackWarning: 'VAŠE ZÁKLADNA JE POD ÚTOKEM!',
     blackFieldSuccess: 'Černé pole obsazeno!',
     phase1TimerPickField: 'Vyberte pole!',
@@ -254,7 +252,6 @@ export const translations: Record<Language, Translations> = {
     enterLobbyCode: 'Enter lobby code...',
     join: 'Join',
     selectCategories: 'Select question categories (min. 1)',
-    waitingForPlayers: 'Waiting for players...',
     shareCode: 'Share this code with your friends:',
     copyCode: 'Copy Code',
     codeCopied: 'Code copied!',
@@ -330,7 +327,7 @@ export const translations: Record<Language, Translations> = {
     finalScore: 'Final score: {0} points',
     victoryBonus: 'Victory bonus: +{0}',
     finalStandings: 'Final Standings:',
-    // FIX: Removed duplicate 'tiebreaker' key. The camelCase 'tieBreaker' is used in the app.
+    tieBreaker: 'TIE-BREAKER!',
     repairingBase: 'Repairing Base',
     question: 'Question',
     yourAnswer: 'Type your answer...',
@@ -364,7 +361,6 @@ export const translations: Record<Language, Translations> = {
     
     // New Event/Timer keys
     phase1End: 'Phase 1 has ended! Attacks begin!',
-    tieBreaker: 'TIE-BREAKER!',
     baseUnderAttackWarning: 'YOUR BASE IS UNDER ATTACK!',
     blackFieldSuccess: 'Black field captured!',
     phase1TimerPickField: 'Select a field!',
@@ -437,7 +433,6 @@ export const translations: Record<Language, Translations> = {
     enterLobbyCode: 'Lobby-Code eingeben...',
     join: 'Beitreten',
     selectCategories: 'Fragekategorien auswählen (min. 1)',
-    waitingForPlayers: 'Warte auf Spieler...',
     shareCode: 'Teile diesen Code mit deinen Freunden:',
     copyCode: 'Code kopieren',
     codeCopied: 'Code kopiert!',
@@ -513,7 +508,7 @@ export const translations: Record<Language, Translations> = {
     finalScore: 'Endstand: {0} Punkte',
     victoryBonus: 'Siegbonus: +{0}',
     finalStandings: 'Endwertung:',
-    // FIX: Removed duplicate 'tiebreaker' key. The camelCase 'tieBreaker' is used in the app.
+    tieBreaker: 'STICHFRAGE!',
     repairingBase: 'Repariere Basis',
     question: 'Frage',
     yourAnswer: 'Gib deine Antwort ein...',
@@ -547,7 +542,6 @@ export const translations: Record<Language, Translations> = {
     
     // New Event/Timer keys
     phase1End: 'Phase 1 beendet! Angriffe beginnen!',
-    tieBreaker: 'STICHFRAGE!',
     baseUnderAttackWarning: 'DEINE BASIS WIRD ANGEGRIFFEN!',
     blackFieldSuccess: 'Schwarzes Feld erobert!',
     phase1TimerPickField: 'Wähle ein Feld!',
@@ -620,7 +614,6 @@ export const translations: Record<Language, Translations> = {
     enterLobbyCode: 'Introduce el código del lobby...',
     join: 'Unirse',
     selectCategories: 'Selecciona categorías de preguntas (mín. 1)',
-    waitingForPlayers: 'Esperando jugadores...',
     shareCode: 'Comparte este código con tus amigos:',
     copyCode: 'Copiar código',
     codeCopied: '¡Código copiado!',
@@ -696,7 +689,7 @@ export const translations: Record<Language, Translations> = {
     finalScore: 'Puntuación final: {0} puntos',
     victoryBonus: 'Bono de victoria: +{0}',
     finalStandings: 'Clasificación Final:',
-    // FIX: Removed duplicate 'tiebreaker' key. The camelCase 'tieBreaker' is used in the app.
+    tieBreaker: '¡DESEMPATE!',
     repairingBase: 'Reparando Base',
     question: 'Pregunta',
     yourAnswer: 'Escribe tu respuesta...',
@@ -730,7 +723,6 @@ export const translations: Record<Language, Translations> = {
     
     // New Event/Timer keys
     phase1End: '¡La Fase 1 ha terminado! ¡Comienzan los ataques!',
-    tieBreaker: '¡DESEMPATE!',
     baseUnderAttackWarning: '¡TU BASE ESTÁ BAJO ATAQUE!',
     blackFieldSuccess: '¡Campo negro capturado!',
     phase1TimerPickField: '¡Selecciona un campo!',
