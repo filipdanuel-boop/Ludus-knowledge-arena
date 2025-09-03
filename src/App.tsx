@@ -55,33 +55,38 @@ const AppContent = () => {
     setIsLanguageSet(true);
   };
 
-  // This effect now ONLY handles the initial login check.
+  // This effect handles the initial user load and language synchronization.
   React.useEffect(() => {
-    if (isLanguageSet) {
-      const loggedInUser = userService.getLoggedInUser();
-      if (loggedInUser) {
-        // When we find a logged-in user, their saved language is the source of truth.
-        // We update the language context to match it.
-        setLanguage(loggedInUser.language);
-        setUser(loggedInUser);
-        setScreen('LOBBY');
-      }
+    // Only run this logic once the initial language has been determined.
+    if (!isLanguageSet) return;
+
+    // If there's no user in the state yet, try to load one from storage.
+    if (!user) {
+        const loggedInUser = userService.getLoggedInUser();
+        if (loggedInUser) {
+            // A user was found in storage.
+            // Update the app state with this user.
+            setUser(loggedInUser);
+            // Sync the language context to match the user's saved language.
+            setLanguage(loggedInUser.language);
+            // Navigate to the lobby.
+            setScreen('LOBBY');
+        } else {
+            // No user in storage, stay on the Auth screen.
+            setScreen('AUTH');
+        }
+    } else {
+        // If a user is already in the state, ensure their language preference
+        // is kept in sync with the language context (e.g., if changed via dropdown).
+        if (user.language !== language) {
+            const updatedUser = { ...user, language };
+            setUser(updatedUser);
+            userService.saveUserData(updatedUser);
+        }
     }
-    // This effect should only run once when the language is initially set.
-    // The dependency array is intentionally incomplete to prevent re-running on language change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLanguageSet]);
-
-
-  // This effect is responsible for KEEPING the user object and localStorage
-  // in sync with the language context if the user changes it later.
-  React.useEffect(() => {
-      if (user && user.language !== language) {
-          const updatedUser = { ...user, language };
-          setUser(updatedUser);
-          userService.saveUserData(updatedUser);
-      }
-  }, [language, user]);
+  // This hook is designed to react to changes in `isLanguageSet`, `user`, and `language`.
+  // It ensures smooth initial loading and consistent state synchronization.
+  }, [isLanguageSet, user, language, setLanguage]);
 
   React.useEffect(() => {
     localStorage.setItem('ludus_theme', theme);
@@ -146,13 +151,17 @@ const AppContent = () => {
   };
 
   const renderScreen = () => {
+    // Wait until language and user are settled before rendering anything
+    if (!isLanguageSet || (isLanguageSet && screen !== 'AUTH' && !user)) {
+        return <div className="min-h-screen flex items-center justify-center"><Spinner themeConfig={themeConfig} /></div>;
+    }
+      
     switch (screen) {
       case 'AUTH':
         return <AuthScreen onLogin={handleLogin} themeConfig={themeConfig}/>;
       case 'LOBBY':
-        if (!user) return <div className="min-h-screen flex items-center justify-center"><Spinner themeConfig={themeConfig} /></div>;
         return <LobbyScreen 
-            user={user} 
+            user={user!} 
             setUser={setUser}
             onNavigate={(s) => setScreen(s as Screen)} 
             onGetFreeCoins={() => setIsAdModalOpen(true)} 
@@ -179,17 +188,15 @@ const AppContent = () => {
       case 'RULES':
         return <RulesScreen onBack={() => setScreen('LOBBY')} themeConfig={themeConfig} />;
        case 'PROFILE':
-        if (!user) return <AuthScreen onLogin={handleLogin} themeConfig={themeConfig} />;
-        return <ProfileScreen user={user} setUser={setUser} onBack={() => setScreen('LOBBY')} themeConfig={themeConfig} />;
+        return <ProfileScreen user={user!} setUser={setUser} onBack={() => setScreen('LOBBY')} themeConfig={themeConfig} />;
       case 'LEADERBOARD':
-        if (!user) return <AuthScreen onLogin={handleLogin} themeConfig={themeConfig} />;
-        return <LeaderboardScreen user={user} onBack={() => setScreen('LOBBY')} themeConfig={themeConfig} />;
+        return <LeaderboardScreen user={user!} onBack={() => setScreen('LOBBY')} themeConfig={themeConfig} />;
       case 'GAME':
-        if (!gameState || !user) return <div className="min-h-screen flex items-center justify-center"><Spinner themeConfig={themeConfig} /></div>;
+        if (!gameState) return <div className="min-h-screen flex items-center justify-center"><Spinner themeConfig={themeConfig} /></div>;
         return <GameScreen 
             gameState={gameState}
             dispatch={dispatch}
-            user={user}
+            user={user!}
             setUser={setUser}
             onBackToLobby={handleBackToLobby}
             themeConfig={themeConfig}

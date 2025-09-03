@@ -37,25 +37,26 @@ export const PhaseTimerUI: React.FC<PhaseTimerUIProps> = ({ phase, startTime, du
 
     if (timeLeft === 0) return null;
 
+    // This is the critical fix: the overlay should not block pointer events
+    // during the field selection phase.
     const allowClicksThrough = phase === GamePhase.Phase1_PickField;
 
     return (
-        // This root container is now just for positioning and has no pointer-events logic itself.
-        <div className="fixed inset-0 z-40">
-            {/* The overlay is a dedicated layer that explicitly controls click blocking. */}
+        // The root container handles positioning.
+        <div className={`fixed inset-0 z-40 flex flex-col items-center justify-center`}>
+            {/* The overlay is a separate element for the background dimming effect. */}
+            {/* Its interactivity is controlled by the 'pointer-events-none' class. */}
             <div 
-                className={`absolute inset-0 bg-black/70 animate-fade-in ${allowClicksThrough ? 'pointer-events-none' : 'pointer-events-auto'}`}
+                className={`absolute inset-0 bg-black/70 animate-fade-in ${allowClicksThrough ? 'pointer-events-none' : ''}`}
             />
             
-            {/* The text content is in a separate container that is always transparent to clicks. */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                 <div className="relative animate-fade-in text-center">
-                    <p className={`text-3xl mb-4 font-semibold ${themeConfig.accentTextLight}`}>{getTextForPhase()}</p>
-                    <div className="text-8xl font-bold text-white">
-                        {Math.ceil(timeLeft)}
-                    </div>
-                    {timeLeft <= 3 && timeLeft > 0 && <p className="text-xl mt-4 font-semibold text-red-500 animate-pulse">{t('timeUp')}</p>}
+            {/* The text content is always non-interactive. */}
+            <div className="relative animate-fade-in text-center pointer-events-none">
+                <p className={`text-3xl mb-4 font-semibold ${themeConfig.accentTextLight}`}>{getTextForPhase()}</p>
+                <div className="text-8xl font-bold text-white">
+                    {Math.ceil(timeLeft)}
                 </div>
+                {timeLeft <= 3 && timeLeft > 0 && <p className="text-xl mt-4 font-semibold text-red-500 animate-pulse">{t('timeUp')}</p>}
             </div>
         </div>
     );

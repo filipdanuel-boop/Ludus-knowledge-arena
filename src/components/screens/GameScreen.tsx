@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { GameState, User, Theme, Player, Category, GamePhase, Question } from '../../types';
+import { GameState, User, Theme, Category, GamePhase, Question } from '../../types';
 import { themes } from '../../themes';
 import { GameAction } from '../../types';
 import { generateQuestion, generateOpenEndedQuestion } from '../../services/geminiService';
@@ -21,7 +21,6 @@ import { EliminationFeedbackModal } from '../game/EliminationFeedbackModal';
 import { Spinner } from '../ui/Spinner';
 import { PhaseTimerUI } from '../game/PhaseTimerUI';
 import { PhaseTransitionScreen } from '../game/PhaseTransitionScreen';
-// FIX: GameEventNotification import was missing due to previous refactoring errors.
 import { GameEventNotification } from '../ui/GameEventNotification';
 
 
@@ -40,14 +39,11 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
     const [attackTarget, setAttackTarget] = React.useState<{ targetFieldId: number; defenderId?: string; isBaseAttack: boolean; } | null>(null);
     const [gameTime, setGameTime] = React.useState(0);
     const [boardRotation, setBoardRotation] = React.useState(0);
-    // State for showing contextual notifications
     const [eventNotification, setEventNotification] = React.useState<{type: 'info' | 'success' | 'warning' | 'danger', message: string} | null>(null);
     
+    // This is the single source of truth for the current player, derived from the game state.
     const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
-    if (!currentPlayer) {
-        return <div className="min-h-screen flex items-center justify-center"><Spinner themeConfig={themeConfig} /></div>;
-    }
-    
+
     // Main Game Timer
     React.useEffect(() => {
         const timer = setInterval(() => {
@@ -86,23 +82,20 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
                 dispatch({ type: 'SET_PHASE1_SELECTION', payload: { playerId: humanPlayer.id, fieldId }});
             }
         } else if (gameState.gamePhase === GamePhase.Phase2_Attacks) {
-            const currentPlayerFromState = gameState.players[gameState.currentTurnPlayerIndex];
-            if (currentPlayerFromState.isBot || currentPlayerFromState.id !== humanPlayer.id || !getAttackers(gameState.players).some(p => p.id === currentPlayerFromState.id)) return;
+            if (currentPlayer.isBot || currentPlayer.id !== humanPlayer.id || !getAttackers(gameState.players).some(p => p.id === currentPlayer.id)) return;
     
-            // Heal Action
-            if (field.ownerId === currentPlayerFromState.id && field.type === 'PLAYER_BASE' && field.hp < field.maxHp) {
+            if (field.ownerId === currentPlayer.id && field.type === 'PLAYER_BASE' && field.hp < field.maxHp) {
                  setIsProcessingQuestion(true);
                  const question = await generateQuestion(field.category!, gameState.questionHistory, user.language, gameState.botDifficulty);
                  setIsProcessingQuestion(false);
                  if (question) {
-                     dispatch({ type: 'SET_QUESTION', payload: { question, questionType: 'MULTIPLE_CHOICE', targetFieldId: fieldId, attackerId: currentPlayerFromState.id, isBaseAttack: false, isTieBreaker: false, actionType: 'HEAL', playerAnswers: { [currentPlayerFromState.id]: null }, startTime: Date.now(), category: field.category! } });
+                     dispatch({ type: 'SET_QUESTION', payload: { question, questionType: 'MULTIPLE_CHOICE', targetFieldId: fieldId, attackerId: currentPlayer.id, isBaseAttack: false, isTieBreaker: false, actionType: 'HEAL', playerAnswers: { [currentPlayer.id]: null }, startTime: Date.now(), category: field.category! } });
                  }
                  return;
             }
     
-            // Attack Actions
-            if (field.type === 'BLACK' || (field.ownerId && field.ownerId !== currentPlayerFromState.id)) {
-                 if(field.type === 'BLACK') {
+            if (field.type === 'BLACK' || (field.ownerId && field.ownerId !== currentPlayer.id)) {
+                if(field.type === 'BLACK') {
                     setEventNotification({ type: 'success', message: t('blackFieldSuccess') });
                 }
                 setAttackTarget({ targetFieldId: fieldId, defenderId: field.ownerId || undefined, isBaseAttack: field.type === 'PLAYER_BASE' });
@@ -112,7 +105,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
     
     const handleCategorySelect = async (category: Category) => {
         if (!attackTarget) return;
-        const currentPlayerFromState = gameState.players[gameState.currentTurnPlayerIndex];
         
         setAttackTarget(null);
         setIsProcessingQuestion(true);
@@ -121,10 +113,10 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
     
         if (question) {
             const { targetFieldId, defenderId, isBaseAttack } = attackTarget;
-            const playerAnswers: Record<string, null> = { [currentPlayerFromState.id]: null };
+            const playerAnswers: Record<string, null> = { [currentPlayer.id]: null };
             if (defenderId) playerAnswers[defenderId] = null;
     
-            dispatch({ type: 'SET_QUESTION', payload: { question, questionType: 'MULTIPLE_CHOICE', targetFieldId, attackerId: currentPlayerFromState.id, defenderId, isBaseAttack, isTieBreaker: false, playerAnswers, startTime: Date.now(), actionType: 'ATTACK', category: category } });
+            dispatch({ type: 'SET_QUESTION', payload: { question, questionType: 'MULTIPLE_CHOICE', targetFieldId, attackerId: currentPlayer.id, defenderId, isBaseAttack, isTieBreaker: false, playerAnswers, startTime: Date.now(), actionType: 'ATTACK', category: category } });
         }
     };
 
@@ -134,23 +126,17 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
         dispatch({ type: 'SUBMIT_ANSWER', payload: { playerId: humanPlayer.id, answer, category: gameState.activeQuestion.category } });
     };
 
-    // This effect centralizes all state-driven game flow logic.
+    // This is the CENTRAL GAME LOOP effect. It reacts to state changes from the reducer.
     React.useEffect(() => {
         const { gamePhase, activeQuestion } = gameState;
-        setEventNotification(null); // Clear notification on phase change
 
-        // Phase 1: Auto-selection timeout
-        if (gamePhase === GamePhase.Phase1_PickField) {
-            const timer = setTimeout(() => dispatch({ type: 'AUTO_SELECT_FIELD' }), 5000);
-            return () => clearTimeout(timer);
-        }
-
-        // Phase 1: Show question after selection resolve
-        if (gamePhase === GamePhase.Phase1_ShowQuestion) {
-            const timer = setTimeout(async () => {
-                const humanPlayer = gameState.players.find(p => !p.isBot)!;
-                const fieldId = gameState.phase1Selections![humanPlayer.id]!;
-                const field = gameState.board.find(f => f.id === fieldId)!;
+        // Phase 1: If it's time to show the question, this logic runs.
+        if (gamePhase === GamePhase.Phase1_ShowQuestion && !activeQuestion && !isProcessingQuestion) {
+            const humanPlayer = gameState.players.find(p => !p.isBot)!;
+            const fieldId = gameState.phase1Selections![humanPlayer.id]!;
+            const field = gameState.board.find(f => f.id === fieldId)!;
+            
+            (async () => {
                 setIsProcessingQuestion(true);
                 const question = await generateQuestion(field.category!, gameState.questionHistory, user.language, 'easy');
                 setIsProcessingQuestion(false);
@@ -162,71 +148,68 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
                     
                     dispatch({ type: 'SET_QUESTION', payload: { question, questionType: 'MULTIPLE_CHOICE', targetFieldId: fieldId, attackerId: 'system', isBaseAttack: false, isTieBreaker: false, playerAnswers: allPlayerAnswers, startTime: Date.now(), actionType: 'ATTACK', category: field.category! } });
 
+                    // Bots answer immediately after question is set
                     gameState.players.forEach(p => {
                         if (p.isBot && !p.isEliminated) {
                              dispatch({ type: 'SUBMIT_ANSWER', payload: { playerId: p.id, answer: Math.random() < BOT_SUCCESS_RATES.easy ? question.correctAnswer : 'wrong', category: field.category! } });
                         }
                     });
                 }
-            }, 5000);
-             return () => clearTimeout(timer);
+            })();
         }
         
         // Phase 1 & 2: Combat Resolution
-        if (gamePhase === GamePhase.Phase2_CombatResolve || (gamePhase === GamePhase.Phase1_ResolveRound && activeQuestion && Object.values(activeQuestion.playerAnswers).every(a => a !== null))) {
+        if (gamePhase === GamePhase.Phase2_CombatResolve || gamePhase === GamePhase.Phase1_ResolveRound) {
             const timer = setTimeout(() => dispatch({ type: 'RESOLVE_COMBAT' }), 1500);
             return () => clearTimeout(timer);
         }
 
         // Phase 2: Bot turn logic
-        if (gamePhase === GamePhase.Phase2_Attacks && !activeQuestion && !isProcessingQuestion) {
-            const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
-            if (currentPlayer?.isBot && getAttackers(gameState.players).some(p => p.id === currentPlayer.id)) {
-                const timer = setTimeout(async () => {
-                    const bot = gameState.players[gameState.currentTurnPlayerIndex];
-                    const decision = decideBotAction(gameState);
-                    if (decision.action === 'PASS') {
-                        dispatch({ type: 'PASS_BOT_TURN', payload: { botId: bot.id, reason: decision.reason! }});
-                        return;
-                    }
+        if (gamePhase === GamePhase.Phase2_Attacks && !activeQuestion && !isProcessingQuestion && currentPlayer?.isBot && getAttackers(gameState.players).some(p => p.id === currentPlayer.id)) {
+            const timer = setTimeout(async () => {
+                const decision = decideBotAction(gameState);
+                if (decision.action === 'PASS') {
+                    dispatch({ type: 'PASS_BOT_TURN', payload: { botId: currentPlayer.id, reason: decision.reason! }});
+                    return;
+                }
 
-                    const { action, targetField, category, difficulty } = decision;
-                    const question = await generateQuestion(category!, gameState.questionHistory, 'cs', difficulty!);
+                const { action, targetField, category, difficulty } = decision;
+                const question = await generateQuestion(category!, gameState.questionHistory, 'cs', difficulty!);
+                
+                if (question) {
+                    const defender = action === 'ATTACK' ? gameState.players.find(p => p.id === targetField!.ownerId) : undefined;
+                    const playerAnswers: Record<string, string | null> = { [currentPlayer.id]: null };
                     
-                    if (question) {
-                        const defender = action === 'ATTACK' ? gameState.players.find(p => p.id === targetField!.ownerId) : undefined;
-                        const playerAnswers: Record<string, string | null> = { [bot.id]: null };
-                        
-                        if (defender) {
-                            playerAnswers[defender.id] = null;
-                            if (!defender.isBot && targetField?.type === 'PLAYER_BASE') {
-                                setEventNotification({type: 'danger', message: t('baseUnderAttackWarning')});
-                            }
+                    if (defender) {
+                        playerAnswers[defender.id] = null;
+                        if (!defender.isBot && targetField?.type === 'PLAYER_BASE') {
+                            setEventNotification({type: 'danger', message: t('baseUnderAttackWarning')});
                         }
-
-                        dispatch({ type: 'SET_QUESTION', payload: { question, questionType: 'MULTIPLE_CHOICE', targetFieldId: targetField!.id, attackerId: bot.id, defenderId: defender?.id, isBaseAttack: targetField!.type === 'PLAYER_BASE', isTieBreaker: false, playerAnswers, startTime: Date.now(), actionType: action as 'ATTACK' | 'HEAL', category: category! }});
-
-                        dispatch({ type: 'SUBMIT_ANSWER', payload: { playerId: bot.id, answer: Math.random() < BOT_SUCCESS_RATES[gameState.botDifficulty] ? question.correctAnswer : "wrong", category: category! } });
-                        if (defender?.isBot) {
-                             dispatch({ type: 'SUBMIT_ANSWER', payload: { playerId: defender.id, answer: Math.random() < BOT_SUCCESS_RATES[gameState.botDifficulty] ? question.correctAnswer : "wrong_2", category: category! } });
-                        }
-                    } else {
-                         dispatch({ type: 'PASS_BOT_TURN', payload: { botId: bot.id, reason: "Chyba při generování otázky." }});
                     }
-                }, 2000);
-                 return () => clearTimeout(timer);
-            }
+
+                    dispatch({ type: 'SET_QUESTION', payload: { question, questionType: 'MULTIPLE_CHOICE', targetFieldId: targetField!.id, attackerId: currentPlayer.id, defenderId: defender?.id, isBaseAttack: targetField!.type === 'PLAYER_BASE', isTieBreaker: false, playerAnswers, startTime: Date.now(), actionType: action as 'ATTACK' | 'HEAL', category: category! }});
+
+                    // Bots submit their answers immediately after the question is set
+                    dispatch({ type: 'SUBMIT_ANSWER', payload: { playerId: currentPlayer.id, answer: Math.random() < BOT_SUCCESS_RATES[gameState.botDifficulty] ? question.correctAnswer : "wrong", category: category! } });
+                    if (defender?.isBot) {
+                         dispatch({ type: 'SUBMIT_ANSWER', payload: { playerId: defender.id, answer: Math.random() < BOT_SUCCESS_RATES[gameState.botDifficulty] ? question.correctAnswer : "wrong_2", category: category! } });
+                    }
+                } else {
+                     dispatch({ type: 'PASS_BOT_TURN', payload: { botId: currentPlayer.id, reason: "Chyba při generování otázky." }});
+                }
+            }, 2000);
+            return () => clearTimeout(timer);
         }
         
         // Phase 2: Tiebreaker question generation
         if (gamePhase === GamePhase.Phase2_Tiebreaker && !activeQuestion) {
-             setEventNotification({ type: 'info', message: t('tieBreaker') });
+            setEventNotification({ type: 'info', message: t('tieBreaker') });
             const timer = setTimeout(async () => {
                  const tieBreakerQuestion = await generateOpenEndedQuestion(Category.Sport, gameState.questionHistory, user.language, 'hard');
                  if (tieBreakerQuestion) {
                     dispatch({ type: 'SET_TIEBREAKER_QUESTION', payload: { question: tieBreakerQuestion } });
                  } else {
-                    dispatch({ type: 'RESOLVE_COMBAT' });
+                    dispatch({ type: 'RESOLVE_COMBAT' }); // Resolve as a draw if no question can be generated
                  }
             }, 1500);
             return () => clearTimeout(timer);
@@ -248,10 +231,10 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
             return () => clearTimeout(timer);
         }
 
-    }, [gameState, dispatch, user.language, isProcessingQuestion, t]);
+    }, [gameState, dispatch, user.language, isProcessingQuestion, t, currentPlayer]);
 
 
-    // Effect to update user coins/stats at game end
+    // Effect to update user stats/coins at game end
     React.useEffect(() => {
         if (gameState.gamePhase === GamePhase.GameOver) {
             const humanPlayer = gameState.players.find(p => !p.isBot);
@@ -262,7 +245,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
                 const isWinner = gameState.winners?.some(w => w.id === humanPlayer.id) ?? false;
                 userOnServer.luduCoins = humanPlayer.coins + (isWinner ? (gameState.players.length - 1) * WIN_COINS_PER_PLAYER : 0);
                 userService.saveUserData(userOnServer);
-                setUser(userOnServer); // Update App state
+                setUser(userOnServer);
             }
         }
     }, [gameState.gamePhase, gameState.players, gameState.winners, setUser, user.email]);
@@ -296,21 +279,10 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
     };
 
     const phaseName = () => {
-        switch(gameState.gamePhase) {
-            case GamePhase.TransitionToPhase1:
-            case GamePhase.Phase1_PickField:
-            case GamePhase.Phase1_ShowQuestion:
-            case GamePhase.Phase1_ResolveRound:
-                return t('phaseLandGrab');
-            case GamePhase.TransitionToPhase2:
-            case GamePhase.Phase2_Attacks:
-            case GamePhase.Phase2_CombatResolve:
-            case GamePhase.Phase2_Tiebreaker:
-                return t('phaseAttacks');
-            case GamePhase.GameOver:
-                 return t('phaseGameOver');
-            default: return '';
-        }
+        if(gameState.gamePhase.startsWith('Phase1')) return t('phaseLandGrab');
+        if(gameState.gamePhase.startsWith('Phase2')) return t('phaseAttacks');
+        if(gameState.gamePhase === GamePhase.GameOver) return t('phaseGameOver');
+        return '';
     }
     
     const { gamePhase } = gameState;
@@ -322,16 +294,19 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, dispatch, use
         return <PhaseTransitionScreen phaseNumber={phaseInfo.number} phaseName={phaseInfo.name} themeConfig={themeConfig} />;
     }
 
-    // FIX for category usage cycle bug
-    const currentUsedCategories = currentPlayer?.usedAttackCategories || [];
-    let availableCategories = CATEGORIES.filter(c => !currentUsedCategories.includes(c));
-    if (availableCategories.length === 0 && currentUsedCategories.length > 0) {
+    // Fix for category usage cycle bug
+    let availableCategories = CATEGORIES.filter(c => !currentPlayer?.usedAttackCategories.includes(c));
+    if (availableCategories.length === 0 && (currentPlayer?.usedAttackCategories.length || 0) > 0) {
         availableCategories = [...CATEGORIES];
+    }
+
+    if (!currentPlayer) {
+      return <div className="min-h-screen flex items-center justify-center"><Spinner themeConfig={themeConfig} /></div>;
     }
 
     return (
         <div className="min-h-screen flex flex-col">
-            {eventNotification && <GameEventNotification type={eventNotification.type} message={eventNotification.message} />}
+            {eventNotification && <GameEventNotification type={eventNotification.type} message={eventNotification.message} onDismiss={() => setEventNotification(null)} />}
             {gameState.gamePhase === GamePhase.GameOver && <GameOverScreen gameState={gameState} onBackToLobby={onBackToLobby} themeConfig={themeConfig} />}
             <header className={`bg-gray-800/50 p-4 border-b ${themeConfig.accentBorder}`}>
                 <div className="flex justify-between items-center">

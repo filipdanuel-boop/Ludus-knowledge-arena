@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { Theme } from '../../types';
 import { themes } from '../../themes';

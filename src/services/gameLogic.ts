@@ -127,6 +127,8 @@ export const decideBotAction = (gameState: GameState): { action: 'HEAL' | 'ATTAC
         } else {
             let availableCategories = CATEGORIES.filter(c => !bot.usedAttackCategories.includes(c));
             if (availableCategories.length === 0) {
+                // Reset the categories if all have been used
+                bot.usedAttackCategories = [];
                 availableCategories = [...CATEGORIES];
             }
             category = availableCategories[Math.floor(Math.random() * availableCategories.length)];
@@ -194,6 +196,8 @@ export const decideBotAction = (gameState: GameState): { action: 'HEAL' | 'ATTAC
     } else { // ATTACK
         let availableCategories = CATEGORIES.filter(c => !bot.usedAttackCategories.includes(c));
         if (availableCategories.length === 0) {
+            // Reset categories if all used
+            bot.usedAttackCategories = [];
             availableCategories = [...CATEGORIES];
         }
 
@@ -296,7 +300,7 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
             const allPlayersSelected = activePlayers.every(p => updatedSelections[p.id] != null);
 
             if (allPlayersSelected) {
-                return { ...state, phase1Selections: updatedSelections, gamePhase: GamePhase.Phase1_ShowQuestion, phaseStartTime: Date.now() };
+                return { ...state, phase1Selections: updatedSelections, gamePhase: GamePhase.Phase1_ShowQuestion };
             }
             return { ...state, phase1Selections: updatedSelections };
         }
@@ -307,10 +311,8 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
             const newState = JSON.parse(JSON.stringify(state));
             const attacker = newState.players.find((p: Player) => p.id === attackerId);
 
-            // CRITICAL FIX for category usage cycle.
             if (attacker && actionType === 'ATTACK' && !isBaseAttack) {
                 let used = [...attacker.usedAttackCategories];
-                // If a new cycle starts (player chose from a full list of options), reset their used list first.
                 if (used.length === CATEGORIES.length) {
                     used = [];
                 }
@@ -391,9 +393,9 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
                     newState.gameLog.push(`${attacker.name} neuspěl při opravě.`);
                 }
             } else if (actionType === 'ATTACK') {
-                const isAttackerCorrect = normalizeAnswer(playerAnswers[attackerId] || "") === normalizeAnswer(question.correctAnswer);
-                if (defenderId) {
+                if (defenderId) { // Phase 2 combat
                     const defender = newState.players.find((p: Player) => p.id === defenderId)!;
+                    const isAttackerCorrect = normalizeAnswer(playerAnswers[attackerId] || "") === normalizeAnswer(question.correctAnswer);
                     const isDefenderCorrect = normalizeAnswer(playerAnswers[defenderId] || "") === normalizeAnswer(question.correctAnswer);
                     
                     if (isAttackerCorrect && isDefenderCorrect && !isBaseAttack && !isTieBreaker) {
@@ -424,7 +426,7 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
                         attacker.score += POINTS.ATTACK_LOSS_ATTACKER;
                         newState.gameLog.push(`Útok hráče ${attacker.name} se nezdařil, oba odpověděli špatně.`);
                     }
-                } else { // This handles Phase 1 land grab
+                } else { // Phase 1 land grab
                     newState.players.forEach((player: Player) => {
                          const fieldToUpdateId = newState.phase1Selections[player.id];
                          if (fieldToUpdateId === null || fieldToUpdateId === undefined) return;
@@ -434,12 +436,16 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
                          const wasCorrect = normalizeAnswer(playerAnswer || '') === normalizeAnswer(question.correctAnswer);
 
                          if (wasCorrect) {
-                             fieldToUpdate.ownerId = player.id;
-                             player.score += POINTS.PHASE1_CLAIM;
-                             newState.gameLog.push(`${player.name} zabral pole.`);
+                             if(fieldToUpdate.ownerId === null) { // Prevent multiple players claiming the same field
+                                fieldToUpdate.ownerId = player.id;
+                                player.score += POINTS.PHASE1_CLAIM;
+                                newState.gameLog.push(`${player.name} zabral pole.`);
+                             }
                          } else {
-                             fieldToUpdate.type = FieldType.Black;
-                             newState.gameLog.push(`${player.name} neuspěl, pole zčernalo.`);
+                             if(fieldToUpdate.ownerId === null) {
+                                fieldToUpdate.type = FieldType.Black;
+                                newState.gameLog.push(`${player.name} neuspěl, pole zčernalo.`);
+                             }
                          }
                     });
                 }
@@ -456,7 +462,6 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
                     newState.gameLog.push("--- Fáze 1 skončila! ---");
                 } else {
                     newState.gamePhase = GamePhase.Phase1_PickField;
-                    newState.phaseStartTime = Date.now();
                 }
                 newState.phase1Selections = {};
             } else {
@@ -501,30 +506,25 @@ export const gameReducer = (state: GameState | null, action: GameAction): GameSt
         
         case 'AUTO_SELECT_FIELD': {
             if (!state || state.gamePhase !== GamePhase.Phase1_PickField) return state;
-            const humanPlayer = state.players.find(p => !p.isBot)!;
             const selections = { ...(state.phase1Selections || {}) };
 
-            if (selections[humanPlayer.id] == null) {
-                const availableFields = state.board.filter(f => f.type === 'NEUTRAL' && !f.ownerId && !Object.values(selections).includes(f.id));
-                if (availableFields.length > 0) {
-                    selections[humanPlayer.id] = availableFields.splice(Math.floor(Math.random() * availableFields.length), 1)[0].id;
-                }
-            }
+            const activePlayers = state.players.filter(p => !p.isEliminated);
             
-            state.players.filter(p => p.isBot && !p.isEliminated).forEach(bot => {
-                if (selections[bot.id] == null) {
+            for(const player of activePlayers) {
+                if (selections[player.id] == null) {
                     const availableFields = state.board.filter(f => f.type === 'NEUTRAL' && !f.ownerId && !Object.values(selections).includes(f.id));
-                     if (availableFields.length > 0) {
-                        selections[bot.id] = availableFields.splice(Math.floor(Math.random() * availableFields.length), 1)[0].id;
+                    if (availableFields.length > 0) {
+                        selections[player.id] = availableFields.splice(Math.floor(Math.random() * availableFields.length), 1)[0].id;
+                    } else {
+                        selections[player.id] = -1; // Indicate no field was available
                     }
                 }
-            });
+            }
 
             return {
                 ...state,
                 phase1Selections: selections,
                 gamePhase: GamePhase.Phase1_ShowQuestion,
-                phaseStartTime: Date.now(),
             };
         }
 

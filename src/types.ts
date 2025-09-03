@@ -136,7 +136,7 @@ export interface LeaderboardEntry {
 
 // --- Game Reducer Actions ---
 export type GameAction =
-  | { type: 'INITIALIZE_GAME'; payload: { playerCount: number; user: User, isOnlineMode?: boolean, botDifficulty?: QuestionDifficulty } }
+  | { type: 'INITIALIZE_GAME'; payload: { playerCount: number; user: User, isOnlineMode?: boolean, botDifficulty: QuestionDifficulty } }
   | { type: 'SET_PHASE1_SELECTION'; payload: { playerId: string; fieldId: number } }
   | { type: 'SET_QUESTION'; payload: GameState['activeQuestion'] }
   | { type: 'SET_TIEBREAKER_QUESTION'; payload: { question: Question } }
